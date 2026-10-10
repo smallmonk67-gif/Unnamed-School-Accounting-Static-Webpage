@@ -1,4 +1,4 @@
-[![Untitled-School-Acounting-Static-Webpage.jpg](https://i.postimg.cc/hGVyqvXD/Untitled-School-Acounting-Static-Webpage.jpg)](https://postimg.cc/Nyf76g8S)
+[![logo.jpg](https://i.postimg.cc/J42R2rDJ/logo.jpg)](https://postimg.cc/rK56dL9F)
 
 # Music School Accounting & Scheduling Webpage
 
