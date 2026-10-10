@@ -1,6 +1,7 @@
 [![logo.jpg](https://i.postimg.cc/J42R2rDJ/logo.jpg)](https://postimg.cc/rK56dL9F)
 
-# Music School Accounting & Scheduling Webpage
+# Unnamed School Accounting Static Webpage
+## a Music School Accounting & Scheduling Webpage
 
 A **100% client-side, zero-backend** accounting, tuition ledger, and lesson scheduling web application designed for music schools, optimized to be hosted on **GitHub Pages**.
 
