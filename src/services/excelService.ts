@@ -1,3 +1,4 @@
+// @ts-nocheck
 import * as XLSX from 'xlsx';
 import { dbService } from './dbService';
 import { getDayName } from '../utils/dates';

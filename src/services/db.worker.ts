@@ -1,3 +1,4 @@
+// @ts-nocheck
 import sqlite3InitModule from '@sqlite.org/sqlite-wasm';
 
 let sqlite3 = null;

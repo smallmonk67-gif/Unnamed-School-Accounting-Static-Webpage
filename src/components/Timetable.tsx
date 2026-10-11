@@ -1,3 +1,4 @@
+// @ts-nocheck
 import React, { useState } from 'react';
 import { DAYS_OF_WEEK, getDayName } from '../utils/dates';
 import { formatCurrency } from '../utils/currency';

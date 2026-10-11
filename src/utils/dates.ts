@@ -8,17 +8,17 @@ export const DAYS_OF_WEEK = [
   { value: 7, label: 'Sunday', short: 'Sun' },
 ];
 
-export function getDayName(dayNumber) {
+export function getDayName(dayNumber: any): string {
   const day = DAYS_OF_WEEK.find(d => d.value === Number(dayNumber));
   return day ? day.label : 'Unknown';
 }
 
-export function getDayShortName(dayNumber) {
+export function getDayShortName(dayNumber: any): string {
   const day = DAYS_OF_WEEK.find(d => d.value === Number(dayNumber));
   return day ? day.short : 'Unknown';
 }
 
-export function formatDate(isoDateString) {
+export function formatDate(isoDateString: any): string {
   if (!isoDateString) return '-';
   try {
     const d = new Date(isoDateString);
@@ -33,7 +33,7 @@ export function formatDate(isoDateString) {
   }
 }
 
-export function formatDateTime(isoString) {
+export function formatDateTime(isoString: any): string {
   if (!isoString) return '-';
   try {
     const d = new Date(isoString);
@@ -50,7 +50,7 @@ export function formatDateTime(isoString) {
   }
 }
 
-export function calculateAge(birthdayString) {
+export function calculateAge(birthdayString: any): string {
   if (!birthdayString) return '';
   const birth = new Date(birthdayString);
   if (isNaN(birth.getTime())) return '';
@@ -63,14 +63,14 @@ export function calculateAge(birthdayString) {
   return age >= 0 ? `${age} yrs` : '';
 }
 
-export function getCurrentPeriod() {
+export function getCurrentPeriod(): string {
   const d = new Date();
   const year = d.getFullYear();
   const month = String(d.getMonth() + 1).padStart(2, '0');
   return `${year}-${month}`;
 }
 
-export function getTodayDate() {
+export function getTodayDate(): string {
   const d = new Date();
   return d.toISOString().split('T')[0];
 }

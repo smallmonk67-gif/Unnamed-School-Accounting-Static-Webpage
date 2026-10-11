@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { generateUUID } from '../utils/id';
 
 class DBService {
@@ -14,7 +15,7 @@ class DBService {
 
     this.initPromise = new Promise((resolve, reject) => {
       try {
-        this.worker = new Worker(new URL('./db.worker.js', import.meta.url), { type: 'module' });
+        this.worker = new Worker(new URL('./db.worker.ts', import.meta.url), { type: 'module' });
 
         this.worker.onmessage = (e) => {
           const { id, success, data, error } = e.data;

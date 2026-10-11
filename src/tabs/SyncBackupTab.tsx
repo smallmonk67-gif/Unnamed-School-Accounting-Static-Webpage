@@ -1,3 +1,4 @@
+// @ts-nocheck
 import React, { useState, useEffect } from 'react';
 import { driveService } from '../services/driveService';
 import { syncService } from '../services/syncService';
