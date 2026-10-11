@@ -76,7 +76,7 @@ export default function Navbar({
             title={isDarkMode ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
             style={{ padding: '0.55rem', borderRadius: '50%' }}
           >
-            {isDarkMode ? <Sun size={18} /> : <Moon size={18} />}
+            {isDarkMode ? <Moon size={18} /> : <Sun size={18} />}
           </button>
 
           {/* Quick Export */}

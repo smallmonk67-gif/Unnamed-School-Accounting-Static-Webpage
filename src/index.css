@@ -181,12 +181,14 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .navbar-actions {
+  flex-wrap: wrap;
   display: flex;
   align-items: center;
   gap: 0.75rem;
 }
 
 .status-indicators {
+  flex-wrap: wrap;
   display: flex;
   align-items: center;
   gap: 0.5rem;
@@ -240,6 +242,7 @@ h1, h2, h3, h4, h5, h6 {
 
 /* Subnav Buttons */
 .subnav-container {
+  flex-wrap: wrap;
   display: inline-flex;
   background: var(--bg-card-subtle);
   padding: 0.3rem;
@@ -436,7 +439,7 @@ h1, h2, h3, h4, h5, h6 {
 /* Metrics Grid */
 .metrics-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 210px), 1fr));
   gap: 1.15rem;
 }
 
@@ -496,7 +499,7 @@ h1, h2, h3, h4, h5, h6 {
 /* Grid Layouts */
 .grid-2-cols {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 360px), 1fr));
   gap: 1.5rem;
 }
 
@@ -1415,15 +1418,34 @@ h1, h2, h3, h4, h5, h6 {
     align-items: flex-start;
   }
   .navbar-actions {
+  flex-wrap: wrap;
     width: 100%;
     flex-wrap: wrap;
     justify-content: flex-start;
   }
-  .form-row-2, .form-row-3, .conflict-grid-2, .backup-actions-grid, .btn-group-2 {
+  .grid-2-cols, .form-row-2, .form-row-3, .conflict-grid-2, .backup-actions-grid, .btn-group-2 {
     grid-template-columns: 1fr;
   }
   .timetable-week-grid {
     grid-template-columns: repeat(7, 160px);
+  }
+}
+
+@media (max-width: 600px) {
+  .main-content {
+    padding: 1rem 0.5rem;
+  }
+  .navbar-container {
+    padding: 1rem;
+  }
+  .card {
+    padding: 1rem;
+  }
+  .input-group {
+    flex-direction: column;
+  }
+  .input-group > * {
+    width: 100%;
   }
 }
 
@@ -1453,4 +1475,14 @@ h1, h2, h3, h4, h5, h6 {
   --shadow-md: 0 4px 12px -1px rgba(0, 0, 0, 0.4), 0 2px 6px -1px rgba(0, 0, 0, 0.2);
   --shadow-lg: 0 10px 25px -3px rgba(0, 0, 0, 0.5), 0 4px 10px -2px rgba(0, 0, 0, 0.3);
   --shadow-xl: 0 20px 35px -5px rgba(0, 0, 0, 0.6), 0 8px 16px -4px rgba(0, 0, 0, 0.4);
+}
+
+@media (max-width: 600px) {
+  .navbar-top {
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+  .navbar-actions {
+    justify-content: center;
+  }
 }
