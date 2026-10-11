@@ -35,6 +35,13 @@ export default function App() {
   const [payments, setPayments] = useState([]);
   const [salaries, setSalaries] = useState([]);
 
+  // Theme state
+  const [isDarkMode, setIsDarkMode] = useState(() => {
+    const saved = localStorage.getItem('theme');
+    if (saved) return saved === 'dark';
+    return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+  });
+
   // Operations state
   const [isSaving, setIsSaving] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
@@ -110,6 +117,23 @@ export default function App() {
       showToast(`Data load error: ${err.message}`, 'error');
     }
   }, [showToast]);
+
+  // Apply theme to document
+  useEffect(() => {
+    if (isDarkMode) {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+  }, [isDarkMode]);
+
+  const toggleDarkMode = () => {
+    setIsDarkMode((prev) => {
+      const next = !prev;
+      localStorage.setItem('theme', next ? 'dark' : 'light');
+      return next;
+    });
+  };
 
   // Initial App Startup
   useEffect(() => {
@@ -424,6 +448,8 @@ export default function App() {
         isSaving={isSaving}
         isSyncing={isSyncing}
         driveConnected={driveConnected}
+        isDarkMode={isDarkMode}
+        onToggleDarkMode={toggleDarkMode}
       />
 
       {/* Main Tab Content */}

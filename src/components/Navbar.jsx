@@ -10,7 +10,9 @@ import {
   Wallet, 
   Settings2, 
   Layers,
-  LayoutDashboard
+  LayoutDashboard,
+  Sun,
+  Moon
 } from 'lucide-react';
 
 export default function Navbar({ 
@@ -21,7 +23,9 @@ export default function Navbar({
   onExportExcel,
   isSaving, 
   isSyncing,
-  driveConnected 
+  driveConnected,
+  isDarkMode,
+  onToggleDarkMode
 }) {
   const navItems = [
     { id: 'overview', label: 'Overview', icon: LayoutDashboard },
@@ -64,6 +68,16 @@ export default function Navbar({
               {driveConnected ? 'Drive Connected' : 'Drive Standby'}
             </span>
           </div>
+
+          {/* Dark Mode Toggle */}
+          <button
+            className="btn btn-secondary btn-icon"
+            onClick={onToggleDarkMode}
+            title={isDarkMode ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
+            style={{ padding: '0.55rem', borderRadius: '50%' }}
+          >
+            {isDarkMode ? <Sun size={18} /> : <Moon size={18} />}
+          </button>
 
           {/* Quick Export */}
           <button 
