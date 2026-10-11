@@ -1196,6 +1196,8 @@ h1, h2, h3, h4, h5, h6 {
   align-items: center;
   justify-content: space-between;
   font-size: 0.85rem;
+  flex-wrap: wrap;
+  gap: 0.25rem;
 }
 
 .status-label {
@@ -1204,6 +1206,8 @@ h1, h2, h3, h4, h5, h6 {
 
 .status-val {
   font-weight: 600;
+  word-break: break-word;
+  overflow-wrap: break-word;
 }
 
 /* Toasts */
@@ -1438,7 +1442,7 @@ h1, h2, h3, h4, h5, h6 {
   .navbar-container {
     padding: 1rem;
   }
-  .card {
+  .card, .content-card {
     padding: 1rem;
   }
   .input-group {
@@ -1446,6 +1450,13 @@ h1, h2, h3, h4, h5, h6 {
   }
   .input-group > * {
     width: 100%;
+  }
+  .status-row {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .btn-group-2, .backup-actions-grid {
+    grid-template-columns: 1fr;
   }
 }
 
