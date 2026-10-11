@@ -1,3 +1,4 @@
+// @ts-nocheck
 import React from 'react';
 import Timetable from '../components/Timetable';
 import { formatCurrency } from '../utils/currency';

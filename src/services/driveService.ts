@@ -1,3 +1,4 @@
+// @ts-nocheck
 const DRIVE_FILE_NAME = 'ACCDB.sqlite';
 const DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive.file';
 

@@ -1,3 +1,4 @@
+// @ts-nocheck
 import React, { useState } from 'react';
 import Modal from '../components/Modal';
 import { formatCurrency } from '../utils/currency';

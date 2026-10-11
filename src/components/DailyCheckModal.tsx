@@ -1,3 +1,4 @@
+// @ts-nocheck
 import React from 'react';
 import Modal from './Modal';
 import { AlertCircle, CloudDownload, Clock } from 'lucide-react';

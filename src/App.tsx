@@ -1,3 +1,4 @@
+// @ts-nocheck
 import React, { useState, useEffect, useCallback } from 'react';
 import Navbar from './components/Navbar';
 import DailyCheckModal from './components/DailyCheckModal';

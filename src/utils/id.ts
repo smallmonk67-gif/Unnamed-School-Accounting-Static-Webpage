@@ -1,5 +1,5 @@
 // UUID v4 generator using browser crypto
-export function generateUUID() {
+export function generateUUID(): string {
   if (typeof crypto !== 'undefined' && crypto.randomUUID) {
     return crypto.randomUUID();
   }
