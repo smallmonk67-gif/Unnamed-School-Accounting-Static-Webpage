@@ -90,6 +90,7 @@ class DBService {
     const res = await this.send('SAVE_TO_OPFS');
     const now = new Date().toISOString();
     await this.setSetting('last_local_save', now);
+    localStorage.setItem('last_local_save', now);
     return { ...res, timestamp: now };
   }
 
@@ -103,6 +104,7 @@ class DBService {
     const res = await this.send('IMPORT_BINARY', { binary: uint8Array });
     const now = new Date().toISOString();
     await this.setSetting('last_local_save', now);
+    localStorage.setItem('last_local_save', now);
     return res;
   }
 
@@ -111,6 +113,7 @@ class DBService {
     const res = await this.send('MERGE_REMOTE', { binary: uint8Array });
     const now = new Date().toISOString();
     await this.setSetting('last_local_save', now);
+    localStorage.setItem('last_local_save', now);
     return res;
   }
 
