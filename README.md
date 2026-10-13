@@ -89,12 +89,12 @@ When two devices make unsynchronized edits:
 
 1. **Install dependencies**:
    ```bash
-   npm install
+   pnpm install
    ```
 
 2. **Build static bundle**:
    ```bash
-   npm run build
+   pnpm run build
    ```
    The production-ready static files are generated in the `dist/` directory.
 
@@ -125,6 +125,6 @@ To enable Google Drive sync:
 
 Run the local Vite dev server:
 ```bash
-npm run dev
+pnpm run dev
 ```
 Open `http://localhost:5173/` in your browser.
