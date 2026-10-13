@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import Navbar from './components/Navbar';
 import DailyCheckModal from './components/DailyCheckModal';
+import SyncWarningModal from './components/SyncWarningModal';
 import ConflictModal from './components/ConflictModal';
 import Toast from './components/Toast';
 
@@ -53,6 +54,7 @@ export default function App() {
   // Modals state
   const [dailyCheckData, setDailyCheckData] = useState(null);
   const [conflictData, setConflictData] = useState(null);
+  const [showSyncWarning, setShowSyncWarning] = useState(false);
 
   // Cross-tab interaction props
   const [prefilledStudentForPayment, setPrefilledStudentForPayment] = useState(null);
@@ -118,6 +120,30 @@ export default function App() {
       showToast(`Data load error: ${err.message}`, 'error');
     }
   }, [showToast]);
+
+  // Unload warning for unsynced changes
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (sessionStorage.getItem('skip_sync_warning') === 'true') {
+        return;
+      }
+
+      const lastLocalSaveTime = new Date(localStorage.getItem('last_local_save') || 0).getTime();
+      const lastSyncedTime = Number(localStorage.getItem('last_synced_timestamp') || 0);
+
+      // We only want to trigger it if there is a local save time and it's strictly greater than the sync time.
+      if (lastLocalSaveTime > 0 && lastLocalSaveTime > lastSyncedTime) {
+        e.preventDefault();
+        e.returnValue = ''; // Standard way to trigger native beforeunload dialog
+        setShowSyncWarning(true);
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, []);
 
   // Apply theme to document
   useEffect(() => {
@@ -278,6 +304,15 @@ export default function App() {
     } catch (err) {
       showToast(`Excel export failed: ${err.message}`, 'error');
     }
+  };
+
+  const handleSyncWarningSync = async () => {
+    await handleSaveAndSync();
+  };
+
+  const handleSyncWarningDontSync = () => {
+    sessionStorage.setItem('skip_sync_warning', 'true');
+    setShowSyncWarning(false);
   };
 
   // Cross-Tab Navigations
@@ -573,6 +608,14 @@ export default function App() {
         onClose={() => setDailyCheckData(null)}
         checkData={dailyCheckData}
         onReplaceWithRemote={handleDailyReplaceWithRemote}
+      />
+
+      {/* Sync Warning Modal (On Close with unsynced changes) */}
+      <SyncWarningModal
+        isOpen={showSyncWarning}
+        onClose={() => setShowSyncWarning(false)}
+        onSync={handleSyncWarningSync}
+        onDontSync={handleSyncWarningDontSync}
       />
 
       {/* Conflict Resolution Modal (Out-of-sync multi-device edits) */}
