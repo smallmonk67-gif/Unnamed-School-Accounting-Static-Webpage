@@ -8,6 +8,22 @@ class DBService {
     this.pendingResolvers = new Map();
     this.initialized = false;
     this.initPromise = null;
+    this.autosaveTimer = null;
+  }
+
+  triggerAutosave() {
+    if (this.autosaveTimer) {
+      clearTimeout(this.autosaveTimer);
+    }
+    // 2-second debounce for autosave
+    this.autosaveTimer = setTimeout(async () => {
+      try {
+        await this.saveToOPFS();
+        console.log('Autosaved to OPFS successfully');
+      } catch (err) {
+        console.error('Autosave to OPFS failed:', err);
+      }
+    }, 2000);
   }
 
   init() {
@@ -170,12 +186,14 @@ class DBService {
         id
       ]);
     }
+    this.triggerAutosave();
     return id;
   }
 
   async deleteStudent(id) {
     const now = new Date().toISOString();
     await this.exec(`UPDATE students SET deleted_at = ?, updated_at = ? WHERE id = ?;`, [now, now, id]);
+    this.triggerAutosave();
   }
 
   // --- Teachers & Qualifications ---
@@ -232,6 +250,7 @@ class DBService {
         id
       ]);
     }
+    this.triggerAutosave();
     return id;
   }
 
@@ -240,6 +259,7 @@ class DBService {
     await this.exec(`UPDATE teachers SET deleted_at = ?, updated_at = ? WHERE id = ?;`, [now, now, id]);
     // Also soft delete qualifications
     await this.exec(`UPDATE teacher_qualifications SET deleted_at = ?, updated_at = ? WHERE teacher_id = ?;`, [now, now, id]);
+    this.triggerAutosave();
   }
 
   async getTeacherQualifications(teacherId = null) {
@@ -296,12 +316,14 @@ class DBService {
         id
       ]);
     }
+    this.triggerAutosave();
     return id;
   }
 
   async deleteTeacherQualification(id) {
     const now = new Date().toISOString();
     await this.exec(`UPDATE teacher_qualifications SET deleted_at = ?, updated_at = ? WHERE id = ?;`, [now, now, id]);
+    this.triggerAutosave();
   }
 
   // --- Categories & Rate Templates ---
@@ -333,6 +355,7 @@ class DBService {
         WHERE id = ?;
       `, [cat.name.trim(), cat.instrument.trim(), cat.certificate.trim(), now, id]);
     }
+    this.triggerAutosave();
     return id;
   }
 
@@ -340,6 +363,7 @@ class DBService {
     const now = new Date().toISOString();
     await this.exec(`UPDATE teacher_categories SET deleted_at = ?, updated_at = ? WHERE id = ?;`, [now, now, id]);
     await this.exec(`UPDATE rate_templates SET deleted_at = ?, updated_at = ? WHERE category_id = ?;`, [now, now, id]);
+    this.triggerAutosave();
   }
 
   async getRateTemplates(categoryId = null) {
@@ -400,6 +424,7 @@ class DBService {
         id
       ]);
     }
+    this.triggerAutosave();
     return id;
   }
 
@@ -460,12 +485,14 @@ class DBService {
         id
       ]);
     }
+    this.triggerAutosave();
     return id;
   }
 
   async deleteCustomizedRate(id) {
     const now = new Date().toISOString();
     await this.exec(`UPDATE customized_rates SET deleted_at = ?, updated_at = ? WHERE id = ?;`, [now, now, id]);
+    this.triggerAutosave();
   }
 
   // Lookup default or customized rate for lesson creation
@@ -609,12 +636,14 @@ class DBService {
         id
       ]);
     }
+    this.triggerAutosave();
     return id;
   }
 
   async deleteMonthlyLesson(id) {
     const now = new Date().toISOString();
     await this.exec(`UPDATE monthly_scheduled_lessons SET deleted_at = ?, updated_at = ? WHERE id = ?;`, [now, now, id]);
+    this.triggerAutosave();
   }
 
   // --- Adhoc Lessons ---
@@ -688,12 +717,14 @@ class DBService {
         id
       ]);
     }
+    this.triggerAutosave();
     return id;
   }
 
   async deleteAdhocLesson(id) {
     const now = new Date().toISOString();
     await this.exec(`UPDATE adhoc_lessons SET deleted_at = ?, updated_at = ? WHERE id = ?;`, [now, now, id]);
+    this.triggerAutosave();
   }
 
   // --- Student Payments (Historical Financial Ledger) ---
@@ -769,12 +800,14 @@ class DBService {
         id
       ]);
     }
+    this.triggerAutosave();
     return id;
   }
 
   async deleteStudentPayment(id) {
     const now = new Date().toISOString();
     await this.exec(`UPDATE student_payments SET deleted_at = ?, updated_at = ? WHERE id = ?;`, [now, now, id]);
+    this.triggerAutosave();
   }
 
   // --- Teacher Salaries (Historical Financial Disbursements) ---
@@ -850,12 +883,14 @@ class DBService {
         id
       ]);
     }
+    this.triggerAutosave();
     return id;
   }
 
   async deleteTeacherSalary(id) {
     const now = new Date().toISOString();
     await this.exec(`UPDATE teacher_salaries SET deleted_at = ?, updated_at = ? WHERE id = ?;`, [now, now, id]);
+    this.triggerAutosave();
   }
 }
 
