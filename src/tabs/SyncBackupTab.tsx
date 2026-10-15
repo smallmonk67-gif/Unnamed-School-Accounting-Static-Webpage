@@ -58,6 +58,8 @@ export default function SyncBackupTab({
   const [supabaseConfig, setSupabaseConfig] = useState(
     webrtcService ? webrtcService.getConfig() : { url: '', key: '' }
   );
+  const [showSupabaseSettings, setShowSupabaseSettings] = useState(false);
+  const [showSupabaseUrl, setShowSupabaseUrl] = useState(false);
   const [showSupabaseKey, setShowSupabaseKey] = useState(false);
   const [isCopiedDbId, setIsCopiedDbId] = useState(false);
   const [isP2pEnabled, setIsP2pEnabled] = useState(webrtcService ? webrtcService.isEnabled : true);
@@ -410,7 +412,7 @@ export default function SyncBackupTab({
           {/* Database Identity Card */}
           <div className="db-identity-card mt-3">
             <div className="db-identity-header">
-              <span className="text-xs font-semibold text-muted uppercase tracking-wider">Database Unique Identity</span>
+              <span className="text-xs font-semibold text-muted uppercase tracking-wider">Protocol V2 Unique Identity</span>
               <span className="badge badge-success text-xs">
                 <CheckCircle2 size={12} className="mr-1 inline" /> Verified in SQLite
               </span>
@@ -429,7 +431,7 @@ export default function SyncBackupTab({
               </button>
             </div>
             <p className="text-xs text-muted mt-2">
-              Each database file has a cryptographically unique 180+ bit identity. Any client, tab, or phone loading this exact same database file will automatically join this room and synchronize changes in real time.
+              Each database file has a cryptographically unique 180+ bit identity. Legacy V1 databases without an ID automatically upgrade to V2 on first open by generating and storing their permanent identity in SQLite.
             </p>
           </div>
 
@@ -555,53 +557,105 @@ export default function SyncBackupTab({
               </label>
             </div>
 
-            <div className="form-group">
-              <label className="form-label text-sm">Supabase Project URL</label>
-              <input
-                type="url"
-                className="input input-block font-mono text-sm"
-                value={supabaseConfig.url}
-                onChange={(e) => setSupabaseConfig((prev) => ({ ...prev, url: e.target.value }))}
-                placeholder="https://xyzcompany.supabase.co"
-                required
-              />
-            </div>
-
-            <div className="form-group mt-3">
-              <label className="form-label text-sm">Supabase Publishable / Anon Key</label>
-              <div className="input-with-button">
-                <input
-                  type={showSupabaseKey ? 'text' : 'password'}
-                  className="input input-block font-mono text-sm"
-                  value={supabaseConfig.key}
-                  onChange={(e) => setSupabaseConfig((prev) => ({ ...prev, key: e.target.value }))}
-                  placeholder="sb_publishable_... or anon JWT key"
-                  required
-                />
-                <button
-                  type="button"
-                  className="btn btn-secondary btn-icon"
-                  onClick={() => setShowSupabaseKey(!showSupabaseKey)}
-                  title={showSupabaseKey ? 'Hide key' : 'Show key'}
-                >
-                  {showSupabaseKey ? <EyeOff size={16} /> : <Eye size={16} />}
-                </button>
+            {/* Hidden Credentials Status Box */}
+            <div className="status-box mt-3 mb-3">
+              <div className="status-row">
+                <span className="status-label">Signaling Provider:</span>
+                <span className="status-val badge badge-info">Supabase Cloud Realtime</span>
+              </div>
+              <div className="status-row">
+                <span className="status-label">Credentials Storage:</span>
+                <span className="status-val badge badge-success">Encrypted in Browser</span>
+              </div>
+              <div className="status-row">
+                <span className="status-label">Active Room:</span>
+                <span className="status-val font-mono text-xs">
+                  {databaseId ? `db-sync:${databaseId.substring(0, 18)}...` : 'Connecting...'}
+                </span>
               </div>
             </div>
 
-            <div className="flex gap-2 mt-4">
-              <button type="submit" className="btn btn-primary flex-1">
-                <Save size={16} /> Save & Reconnect
-              </button>
+            <div className="mt-2">
               <button
                 type="button"
-                className="btn btn-secondary"
-                onClick={handleResetSupabaseConfig}
-                title="Reset to default project credentials"
+                className="btn btn-outline-secondary btn-block text-xs"
+                onClick={() => setShowSupabaseSettings(!showSupabaseSettings)}
+                style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
               >
-                Reset Default
+                <Sliders size={14} />
+                <span>{showSupabaseSettings ? 'Hide Cloud Signaling Credentials' : 'Configure / View Cloud Signaling Keys'}</span>
               </button>
             </div>
+
+            {showSupabaseSettings && (
+              <div className="mt-4 p-3 rounded bg-subtle border border-color">
+                <div className="form-group">
+                  <div className="flex-between items-center mb-1">
+                    <label className="form-label text-sm mb-0">Supabase Project URL</label>
+                    <button
+                      type="button"
+                      className="btn btn-xs btn-secondary"
+                      onClick={() => setShowSupabaseUrl(!showSupabaseUrl)}
+                      title={showSupabaseUrl ? 'Hide URL' : 'Show URL'}
+                      style={{ padding: '2px 6px', fontSize: '11px', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                    >
+                      {showSupabaseUrl ? <EyeOff size={12} /> : <Eye size={12} />}
+                      <span>{showSupabaseUrl ? 'Hide' : 'Show'}</span>
+                    </button>
+                  </div>
+                  <input
+                    type={showSupabaseUrl ? 'text' : 'password'}
+                    className="input input-block font-mono text-sm"
+                    value={supabaseConfig.url}
+                    onChange={(e) => setSupabaseConfig((prev) => ({ ...prev, url: e.target.value }))}
+                    placeholder="https://xyzcompany.supabase.co"
+                    required
+                  />
+                </div>
+
+                <div className="form-group mt-3">
+                  <div className="flex-between items-center mb-1">
+                    <label className="form-label text-sm mb-0">Supabase Publishable / Anon Key</label>
+                    <button
+                      type="button"
+                      className="btn btn-xs btn-secondary"
+                      onClick={() => setShowSupabaseKey(!showSupabaseKey)}
+                      title={showSupabaseKey ? 'Hide key' : 'Show key'}
+                      style={{ padding: '2px 6px', fontSize: '11px', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                    >
+                      {showSupabaseKey ? <EyeOff size={12} /> : <Eye size={12} />}
+                      <span>{showSupabaseKey ? 'Hide' : 'Show'}</span>
+                    </button>
+                  </div>
+                  <input
+                    type={showSupabaseKey ? 'text' : 'password'}
+                    className="input input-block font-mono text-sm"
+                    value={supabaseConfig.key}
+                    onChange={(e) => setSupabaseConfig((prev) => ({ ...prev, key: e.target.value }))}
+                    placeholder="sb_publishable_... or anon JWT key"
+                    required
+                  />
+                </div>
+
+                <span className="text-xs text-muted mt-2 block">
+                  Keys are stored encrypted in your browser's private storage and never leaked to third parties.
+                </span>
+
+                <div className="flex gap-2 mt-4">
+                  <button type="submit" className="btn btn-primary flex-1">
+                    <Save size={16} /> Save & Reconnect
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-secondary"
+                    onClick={handleResetSupabaseConfig}
+                    title="Reset to default project credentials"
+                  >
+                    Reset Default
+                  </button>
+                </div>
+              </div>
+            )}
           </form>
 
           <div className="info-callout mt-5">

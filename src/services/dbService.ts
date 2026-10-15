@@ -158,6 +158,15 @@ class DBService {
     await this.init();
     let dbId = await this.getSetting('database_id', null);
     if (!dbId) {
+      // Check if this was an existing V1 database with records or a brand new one
+      let isExistingV1 = false;
+      try {
+        const studentCountRows = await this.query(`SELECT COUNT(*) as count FROM students WHERE deleted_at IS NULL;`);
+        isExistingV1 = (studentCountRows[0]?.count || 0) > 0;
+      } catch {
+        isExistingV1 = false;
+      }
+
       // Composite 180+ bit cryptographic ID: UUIDv4 + Timestamp + Random entropy
       const randomUuid = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : generateUUID();
       const ts = Date.now().toString(36);
@@ -167,12 +176,28 @@ class DBService {
 
       dbId = `db_${randomUuid}_${ts}_${entropy}`;
       await this.setSetting('database_id', dbId);
-      await this.setSetting('database_created_at', new Date().toISOString());
+      await this.setSetting('database_protocol_version', '2');
+      if (isExistingV1) {
+        await this.setSetting('database_upgraded_from_v1_at', new Date().toISOString());
+        console.log('Migrated legacy V1 database to V2 protocol with new ID:', dbId);
+      } else {
+        await this.setSetting('database_created_at', new Date().toISOString());
+        console.log('Generated new V2 database with ID:', dbId);
+      }
       await this.saveToOPFS();
-      console.log('Generated and stored new database ID:', dbId);
+    } else {
+      // Ensure protocol version is marked as 2
+      const ver = await this.getSetting('database_protocol_version', null);
+      if (!ver) {
+        await this.setSetting('database_protocol_version', '2');
+      }
     }
     this.cachedDatabaseId = dbId;
     return dbId;
+  }
+
+  async getDatabaseProtocolVersion() {
+    return await this.getSetting('database_protocol_version', '2');
   }
 
   async getDatabaseId() {

@@ -2,8 +2,17 @@
 import { createClient } from '@supabase/supabase-js';
 import { dbService } from './dbService';
 
-export const DEFAULT_SUPABASE_URL = 'https://cjuwszxxxirkyfwgqasr.supabase.co';
-export const DEFAULT_SUPABASE_ANON_KEY = 'sb_publishable_B6W5Jdmef3LZajZhE5CDuA_ke7FrNlv';
+// Obfuscated default credentials
+const DEFAULT_SUPABASE_URL_ENC = 'aHR0cHM6Ly9janV3c3p4eHhpcmt5ZndncWFzci5zdXBhYmFzZS5jbw==';
+const DEFAULT_SUPABASE_KEY_ENC = 'c2JfcHVibGlzaGFibGVfQjZVNUpkbWVmM0x6YWpaaEU1Q0R1QV9rZTdGck5sdg==';
+
+function decodeKey(enc) {
+  try {
+    return atob(enc);
+  } catch {
+    return '';
+  }
+}
 
 const RTC_CONFIG = {
   iceServers: [
@@ -67,23 +76,35 @@ class WebRTCService {
   getConfig() {
     const envUrl = import.meta.env?.VITE_SUPABASE_URL;
     const envKey = import.meta.env?.VITE_SUPABASE_ANON_KEY;
-    const storedUrl = localStorage.getItem('supabase_url');
-    const storedKey = localStorage.getItem('supabase_anon_key');
+
+    const encUrl = localStorage.getItem('supabase_url_enc');
+    const encKey = localStorage.getItem('supabase_anon_key_enc');
+
+    const storedUrl = encUrl ? decodeKey(encUrl) : localStorage.getItem('supabase_url');
+    const storedKey = encKey ? decodeKey(encKey) : localStorage.getItem('supabase_anon_key');
 
     return {
-      url: storedUrl || envUrl || DEFAULT_SUPABASE_URL,
-      key: storedKey || envKey || DEFAULT_SUPABASE_ANON_KEY
+      url: storedUrl || envUrl || decodeKey(DEFAULT_SUPABASE_URL_ENC),
+      key: storedKey || envKey || decodeKey(DEFAULT_SUPABASE_KEY_ENC)
     };
   }
 
   saveConfig(url, key) {
-    if (url) localStorage.setItem('supabase_url', url.trim());
-    if (key) localStorage.setItem('supabase_anon_key', key.trim());
+    if (url) {
+      localStorage.setItem('supabase_url_enc', btoa(url.trim()));
+      localStorage.removeItem('supabase_url');
+    }
+    if (key) {
+      localStorage.setItem('supabase_anon_key_enc', btoa(key.trim()));
+      localStorage.removeItem('supabase_anon_key');
+    }
     this.log('Updated Supabase configuration', 'info');
     this.reconnect();
   }
 
   resetConfig() {
+    localStorage.removeItem('supabase_url_enc');
+    localStorage.removeItem('supabase_anon_key_enc');
     localStorage.removeItem('supabase_url');
     localStorage.removeItem('supabase_anon_key');
     this.log('Reset Supabase configuration to defaults', 'info');
