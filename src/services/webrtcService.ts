@@ -265,10 +265,19 @@ class WebRTCService {
             peerId: this.myPeerId,
             joinedAt: Date.now()
           });
-        } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+        } else if (status === 'TIMED_OUT') {
           this.status = 'error';
-          this.error = `Signaling connection ${status}`;
-          this.log(`Signaling channel error: ${status}`, 'error');
+          this.error = 'Signaling connection TIMED_OUT';
+          const isFirefox = typeof navigator !== 'undefined' && navigator.userAgent.toLowerCase().includes('firefox');
+          const hint = isFirefox 
+            ? ' (Firefox detected: disable Enhanced Tracking Protection 🛡️ for this site)' 
+            : ' (Check if VPN or network firewall is blocking WebSockets)';
+          this.log(`Signaling channel error: TIMED_OUT${hint}`, 'error');
+          this.notifyStatus();
+        } else if (status === 'CHANNEL_ERROR') {
+          this.status = 'error';
+          this.error = 'Signaling connection CHANNEL_ERROR';
+          this.log('Signaling channel error: CHANNEL_ERROR (Check Supabase credentials)', 'error');
           this.notifyStatus();
         } else if (status === 'CLOSED') {
           this.status = 'disconnected';
