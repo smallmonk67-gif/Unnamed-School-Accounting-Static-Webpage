@@ -20,7 +20,14 @@ import {
   RefreshCw,
   ExternalLink,
   Eye,
-  EyeOff
+  EyeOff,
+  Radio,
+  Wifi,
+  Send,
+  Sliders,
+  Copy,
+  Check,
+  Terminal
 } from 'lucide-react';
 
 export default function SyncBackupTab({ 
@@ -32,7 +39,12 @@ export default function SyncBackupTab({
   lastSaveTime,
   driveConnected,
   onRefreshData,
-  showToast 
+  showToast,
+  databaseId,
+  webrtcStatus,
+  webrtcPeers,
+  webrtcLogs,
+  webrtcService
 }) {
   const [clientId, setClientId] = useState(driveService.getClientId());
   const [showClientId, setShowClientId] = useState(false);
@@ -42,10 +54,24 @@ export default function SyncBackupTab({
   const [isPulling, setIsPulling] = useState(false);
   const [isExportingExcel, setIsExportingExcel] = useState(false);
 
+  // WebRTC & Supabase local states
+  const [supabaseConfig, setSupabaseConfig] = useState(
+    webrtcService ? webrtcService.getConfig() : { url: '', key: '' }
+  );
+  const [showSupabaseKey, setShowSupabaseKey] = useState(false);
+  const [isCopiedDbId, setIsCopiedDbId] = useState(false);
+  const [isP2pEnabled, setIsP2pEnabled] = useState(webrtcService ? webrtcService.isEnabled : true);
+  const [isSendingSnapshot, setIsSendingSnapshot] = useState(false);
+  const [isRequestingSnapshot, setIsRequestingSnapshot] = useState(false);
+
   useEffect(() => {
     setLastSyncIso(localStorage.getItem('last_synced_iso') || '');
     setLastDriveFileId(localStorage.getItem('last_drive_file_id') || '');
-  }, [isSyncing, isPulling, driveConnected]);
+    if (webrtcService) {
+      setSupabaseConfig(webrtcService.getConfig());
+      setIsP2pEnabled(webrtcService.isEnabled);
+    }
+  }, [isSyncing, isPulling, driveConnected, webrtcService]);
 
   const handleSaveClientId = (e) => {
     e.preventDefault();
@@ -115,6 +141,8 @@ export default function SyncBackupTab({
       const arrayBuffer = await file.arrayBuffer();
       const uint8 = new Uint8Array(arrayBuffer);
       await dbService.importBinary(uint8);
+      const newDbId = await dbService.getOrCreateDatabaseId();
+      if (webrtcService) webrtcService.init(newDbId);
       showToast(`Database restored successfully from "${file.name}"`, 'success');
       onRefreshData();
     } catch (err) {
@@ -134,6 +162,72 @@ export default function SyncBackupTab({
       showToast(`Excel export failed: ${err.message}`, 'error');
     } finally {
       setIsExportingExcel(false);
+    }
+  };
+
+  // Copy Database Unique ID
+  const handleCopyDbId = () => {
+    if (!databaseId) return;
+    navigator.clipboard.writeText(databaseId);
+    setIsCopiedDbId(true);
+    showToast('Database Unique ID copied to clipboard', 'info');
+    setTimeout(() => setIsCopiedDbId(false), 2500);
+  };
+
+  // Save Supabase Configuration
+  const handleSaveSupabaseConfig = (e) => {
+    e.preventDefault();
+    if (!webrtcService) return;
+    webrtcService.saveConfig(supabaseConfig.url, supabaseConfig.key);
+    showToast('Supabase settings saved! Reconnecting signaling...', 'success');
+  };
+
+  // Reset Supabase Configuration
+  const handleResetSupabaseConfig = () => {
+    if (!webrtcService) return;
+    webrtcService.resetConfig();
+    setSupabaseConfig(webrtcService.getConfig());
+    showToast('Supabase settings reset to default', 'info');
+  };
+
+  // Toggle P2P Enabled
+  const handleToggleP2p = () => {
+    if (!webrtcService) return;
+    const next = !isP2pEnabled;
+    setIsP2pEnabled(next);
+    webrtcService.setEnabled(next);
+    showToast(next ? 'WebRTC P2P sync enabled' : 'WebRTC P2P sync disabled', 'info');
+  };
+
+  // Send Database Snapshot to Peer(s)
+  const handleSendSnapshot = async (peerId = null) => {
+    if (!webrtcService) return;
+    try {
+      setIsSendingSnapshot(true);
+      const ok = await webrtcService.sendSnapshotToPeers(peerId);
+      if (ok) {
+        showToast(peerId ? `Pushed database snapshot to peer ${peerId}` : 'Broadcasted snapshot to all peers', 'success');
+      } else {
+        showToast('Failed to send snapshot', 'error');
+      }
+    } finally {
+      setIsSendingSnapshot(false);
+    }
+  };
+
+  // Request Snapshot from Peer
+  const handleRequestSnapshot = () => {
+    if (!webrtcService) return;
+    try {
+      setIsRequestingSnapshot(true);
+      const ok = webrtcService.requestSnapshotFromPeer();
+      if (ok) {
+        showToast('Requested full database snapshot from peer...', 'info');
+      } else {
+        showToast('No online peers connected to request snapshot from', 'warning');
+      }
+    } finally {
+      setTimeout(() => setIsRequestingSnapshot(false), 2000);
     }
   };
 
@@ -299,7 +393,227 @@ export default function SyncBackupTab({
         </div>
       </div>
 
-      {/* Row 2: Direct File Backups & Excel Reports */}
+      {/* Row 2: WebRTC Realtime Peer-to-Peer Database Sync (Supabase Signaling) */}
+      <div className="grid-2-cols mt-6">
+        {/* Left Card: Database Identity & Active P2P Peer Network */}
+        <div className="content-card">
+          <div className="card-header-flex">
+            <div>
+              <h3 className="card-title">Realtime WebRTC Database Sync</h3>
+              <p className="card-subtitle">Zero-latency P2P DataChannel synchronization</p>
+            </div>
+            <div className={`status-indicator-pill ${webrtcPeers?.length > 0 ? 'active' : ''}`}>
+              <Radio size={20} className={webrtcPeers?.length > 0 ? 'text-success' : 'text-muted'} />
+            </div>
+          </div>
+
+          {/* Database Identity Card */}
+          <div className="db-identity-card mt-3">
+            <div className="db-identity-header">
+              <span className="text-xs font-semibold text-muted uppercase tracking-wider">Database Unique Identity</span>
+              <span className="badge badge-success text-xs">
+                <CheckCircle2 size={12} className="mr-1 inline" /> Verified in SQLite
+              </span>
+            </div>
+            <div className="db-identity-code-wrap mt-2">
+              <code className="db-identity-code" title={databaseId || 'Generating...'}>
+                {databaseId || 'Generating unique database ID...'}
+              </code>
+              <button
+                type="button"
+                className="btn btn-secondary btn-icon-small"
+                onClick={handleCopyDbId}
+                title="Copy Database Unique ID to clipboard"
+              >
+                {isCopiedDbId ? <Check size={14} className="text-success" /> : <Copy size={14} />}
+              </button>
+            </div>
+            <p className="text-xs text-muted mt-2">
+              Each database file has a cryptographically unique 180+ bit identity. Any client, tab, or phone loading this exact same database file will automatically join this room and synchronize changes in real time.
+            </p>
+          </div>
+
+          {/* Peer Connection Status */}
+          <div className="peer-network-summary mt-4">
+            <div className="flex-between items-center mb-2">
+              <strong className="text-sm">Connected Peers Online ({webrtcPeers?.length || 0})</strong>
+              <span className={`badge ${webrtcPeers?.length > 0 ? 'badge-p2p-live' : webrtcStatus === 'connected' ? 'badge-p2p-standby' : 'badge-p2p-idle'}`}>
+                <span className={`status-dot ${webrtcPeers?.length > 0 ? 'green pulse' : webrtcStatus === 'connected' ? 'yellow' : 'gray'}`}></span>
+                {webrtcPeers?.length > 0 ? `${webrtcPeers.length} Peer(s) Live` : webrtcStatus === 'connected' ? 'Waiting for Peers' : 'Offline'}
+              </span>
+            </div>
+
+            {webrtcPeers && webrtcPeers.length > 0 ? (
+              <div className="peers-list">
+                {webrtcPeers.map((peer) => (
+                  <div key={peer.id} className="peer-badge-item">
+                    <div className="peer-item-info">
+                      <Wifi size={14} className="text-success inline mr-2" />
+                      <span className="font-mono text-xs">{peer.id}</span>
+                    </div>
+                    <div className="peer-item-actions">
+                      <span className="badge badge-success text-xs mr-2">P2P Channel Open</span>
+                      <button
+                        type="button"
+                        className="btn btn-xs btn-outline"
+                        onClick={() => handleSendSnapshot(peer.id)}
+                        disabled={isSendingSnapshot}
+                        title="Send full database snapshot to this peer"
+                      >
+                        Push DB
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="p2p-empty-state">
+                <p className="text-xs text-muted">
+                  {webrtcStatus === 'connected' 
+                    ? 'No other clients with this database file are currently online. Open this app on another device or browser tab with the same database to see live peer-to-peer sync in action.'
+                    : 'Signaling connection is currently standby or offline. Check Supabase configuration.'}
+                </p>
+              </div>
+            )}
+          </div>
+
+          {/* P2P Snapshot Actions */}
+          <div className="grid-2-cols gap-2 mt-4">
+            <button
+              type="button"
+              className="btn btn-secondary btn-block text-xs"
+              onClick={() => handleSendSnapshot()}
+              disabled={isSendingSnapshot || !webrtcPeers || webrtcPeers.length === 0}
+              title="Push full database snapshot to all connected peers"
+            >
+              <Send size={14} /> Push Snapshot to Peers
+            </button>
+            <button
+              type="button"
+              className="btn btn-secondary btn-block text-xs"
+              onClick={handleRequestSnapshot}
+              disabled={isRequestingSnapshot || !webrtcPeers || webrtcPeers.length === 0}
+              title="Request complete database snapshot from a connected peer"
+            >
+              <RefreshCw size={14} className={isRequestingSnapshot ? 'animate-spin' : ''} /> Request Snapshot from Peer
+            </button>
+          </div>
+
+          {/* Realtime Activity Log Terminal */}
+          <div className="mt-4">
+            <div className="flex-between items-center mb-1">
+              <span className="text-xs font-semibold text-muted flex items-center gap-1">
+                <Terminal size={12} /> Live P2P Sync Log
+              </span>
+              <span className="text-xs text-muted">{webrtcLogs?.length || 0} events</span>
+            </div>
+            <div className="p2p-terminal">
+              {webrtcLogs && webrtcLogs.length > 0 ? (
+                webrtcLogs.map((log) => (
+                  <div key={log.id} className="p2p-log-entry">
+                    <span className="p2p-log-time">[{log.time}]</span>
+                    <span className={`p2p-log-type-${log.type}`}>{log.message}</span>
+                  </div>
+                ))
+              ) : (
+                <div className="text-muted text-xs">Waiting for P2P connection events...</div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Right Card: Supabase Cloud Signaling Configuration */}
+        <div className="content-card">
+          <div className="card-header-flex">
+            <div>
+              <h3 className="card-title">Supabase Cloud Signaling</h3>
+              <p className="card-subtitle">Zero-SQL room management and WebRTC handshake</p>
+            </div>
+            <Sliders size={24} className="text-info" />
+          </div>
+
+          <p className="text-sm text-muted mt-2">
+            WebRTC signaling utilizes Supabase Realtime Broadcast and Presence over WebSockets. 
+            <strong> No Supabase SQL tables or database migrations are required</strong>—signaling messages 
+            and peer discovery are handled entirely in-memory. Once peers connect, all data flows directly peer-to-peer.
+          </p>
+
+          <form onSubmit={handleSaveSupabaseConfig} className="mt-4">
+            {/* P2P Toggle */}
+            <div className="form-group flex-between items-center p-3 rounded bg-subtle mb-4">
+              <div>
+                <strong>Enable WebRTC Realtime Sync</strong>
+                <p className="text-xs text-muted">Toggle peer-to-peer sync for this session</p>
+              </div>
+              <label className="toggle-switch">
+                <input
+                  type="checkbox"
+                  checked={isP2pEnabled}
+                  onChange={handleToggleP2p}
+                />
+                <span className="toggle-slider"></span>
+              </label>
+            </div>
+
+            <div className="form-group">
+              <label className="form-label text-sm">Supabase Project URL</label>
+              <input
+                type="url"
+                className="input input-block font-mono text-sm"
+                value={supabaseConfig.url}
+                onChange={(e) => setSupabaseConfig((prev) => ({ ...prev, url: e.target.value }))}
+                placeholder="https://xyzcompany.supabase.co"
+                required
+              />
+            </div>
+
+            <div className="form-group mt-3">
+              <label className="form-label text-sm">Supabase Publishable / Anon Key</label>
+              <div className="input-with-button">
+                <input
+                  type={showSupabaseKey ? 'text' : 'password'}
+                  className="input input-block font-mono text-sm"
+                  value={supabaseConfig.key}
+                  onChange={(e) => setSupabaseConfig((prev) => ({ ...prev, key: e.target.value }))}
+                  placeholder="sb_publishable_... or anon JWT key"
+                  required
+                />
+                <button
+                  type="button"
+                  className="btn btn-secondary btn-icon"
+                  onClick={() => setShowSupabaseKey(!showSupabaseKey)}
+                  title={showSupabaseKey ? 'Hide key' : 'Show key'}
+                >
+                  {showSupabaseKey ? <EyeOff size={16} /> : <Eye size={16} />}
+                </button>
+              </div>
+            </div>
+
+            <div className="flex gap-2 mt-4">
+              <button type="submit" className="btn btn-primary flex-1">
+                <Save size={16} /> Save & Reconnect
+              </button>
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={handleResetSupabaseConfig}
+                title="Reset to default project credentials"
+              >
+                Reset Default
+              </button>
+            </div>
+          </form>
+
+          <div className="info-callout mt-5">
+            <Info size={16} className="text-info inline mr-1 flex-shrink-0" />
+            <span className="text-xs text-muted">
+              <strong>Collision Protection:</strong> The database ID contains 180+ bits of entropy (composite UUIDv4 + millisecond timestamp + CSPRNG entropy). Peers also exchange an initial handshake confirming matching database identities before any mutations are permitted.
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {/* Row 3: Direct File Backups & Excel Reports */}
       <div className="grid-2-cols mt-6">
         {/* Excel Export */}
         <div className="content-card">

@@ -9,6 +9,25 @@ class DBService {
     this.initialized = false;
     this.initPromise = null;
     this.autosaveTimer = null;
+    this.mutationListeners = [];
+    this.cachedDatabaseId = null;
+  }
+
+  addMutationListener(callback) {
+    this.mutationListeners.push(callback);
+    return () => {
+      this.mutationListeners = this.mutationListeners.filter((cb) => cb !== callback);
+    };
+  }
+
+  notifyMutation(mutation) {
+    for (const listener of this.mutationListeners) {
+      try {
+        listener(mutation);
+      } catch (err) {
+        console.error('Mutation listener error:', err);
+      }
+    }
   }
 
   triggerAutosave() {
@@ -80,9 +99,23 @@ class DBService {
     return await this.send('QUERY', { sql, bind });
   }
 
-  async exec(sql, bind = []) {
+  async exec(sql, bind = [], isRemote = false) {
     await this.init();
-    return await this.send('EXEC', { sql, bind });
+    const result = await this.send('EXEC', { sql, bind });
+    if (!isRemote) {
+      // Don't broadcast internal app_settings updates to avoid loop or setting noise
+      const isInternalSetting = typeof sql === 'string' && sql.includes('app_settings');
+      if (!isInternalSetting) {
+        this.notifyMutation({ sql, bind, timestamp: Date.now() });
+      }
+    }
+    return result;
+  }
+
+  async execRemote(sql, bind = []) {
+    const result = await this.exec(sql, bind, true);
+    this.triggerAutosave();
+    return result;
   }
 
   async saveToOPFS() {
@@ -100,6 +133,7 @@ class DBService {
   }
 
   async importBinary(uint8Array) {
+    this.cachedDatabaseId = null;
     await this.init();
     const res = await this.send('IMPORT_BINARY', { binary: uint8Array });
     const now = new Date().toISOString();
@@ -109,12 +143,40 @@ class DBService {
   }
 
   async mergeRemote(uint8Array) {
+    this.cachedDatabaseId = null;
     await this.init();
     const res = await this.send('MERGE_REMOTE', { binary: uint8Array });
     const now = new Date().toISOString();
     await this.setSetting('last_local_save', now);
     localStorage.setItem('last_local_save', now);
     return res;
+  }
+
+  // --- Database Identity Management ---
+  async getOrCreateDatabaseId() {
+    if (this.cachedDatabaseId) return this.cachedDatabaseId;
+    await this.init();
+    let dbId = await this.getSetting('database_id', null);
+    if (!dbId) {
+      // Composite 180+ bit cryptographic ID: UUIDv4 + Timestamp + Random entropy
+      const randomUuid = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : generateUUID();
+      const ts = Date.now().toString(36);
+      const entropy = typeof crypto !== 'undefined' && crypto.getRandomValues
+        ? Array.from(crypto.getRandomValues(new Uint8Array(6)), (b) => b.toString(16).padStart(2, '0')).join('')
+        : Math.random().toString(36).substring(2, 8);
+
+      dbId = `db_${randomUuid}_${ts}_${entropy}`;
+      await this.setSetting('database_id', dbId);
+      await this.setSetting('database_created_at', new Date().toISOString());
+      await this.saveToOPFS();
+      console.log('Generated and stored new database ID:', dbId);
+    }
+    this.cachedDatabaseId = dbId;
+    return dbId;
+  }
+
+  async getDatabaseId() {
+    return await this.getOrCreateDatabaseId();
   }
 
   // --- App Settings Helper ---

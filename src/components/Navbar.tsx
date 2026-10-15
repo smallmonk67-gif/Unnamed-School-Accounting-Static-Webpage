@@ -26,7 +26,9 @@ export default function Navbar({
   isSyncing,
   driveConnected,
   isDarkMode,
-  onToggleDarkMode
+  onToggleDarkMode,
+  webrtcStatus,
+  webrtcPeers
 }) {
   const navItems = [
     { id: 'overview', label: 'Overview', icon: LayoutDashboard },
@@ -67,6 +69,29 @@ export default function Navbar({
             <span className={`badge ${driveConnected ? 'badge-drive-connected' : 'badge-drive-idle'}`}>
               <span className={`status-dot ${driveConnected ? 'blue' : 'gray'}`}></span>
               {driveConnected ? 'Drive Connected' : 'Drive Standby'}
+            </span>
+            <span 
+              className={`badge ${webrtcPeers?.length > 0 ? 'badge-p2p-live' : webrtcStatus === 'connected' ? 'badge-p2p-standby' : 'badge-p2p-idle'}`}
+              title={
+                webrtcPeers?.length > 0
+                  ? `WebRTC P2P Live Sync: connected to ${webrtcPeers.length} peer(s). Edits synchronize instantly.`
+                  : webrtcStatus === 'connected'
+                  ? 'Signaling active. Waiting for another device/tab with the same database.'
+                  : webrtcStatus === 'connecting'
+                  ? 'Connecting to Supabase Realtime signaling...'
+                  : 'WebRTC P2P sync is offline.'
+              }
+              style={{ cursor: 'pointer' }}
+              onClick={() => onSelectTab('sync')}
+            >
+              <span className={`status-dot ${webrtcPeers?.length > 0 ? 'green pulse' : webrtcStatus === 'connected' ? 'yellow' : 'gray'}`}></span>
+              {webrtcPeers?.length > 0
+                ? `P2P Live (${webrtcPeers.length})`
+                : webrtcStatus === 'connected'
+                ? 'P2P Standby'
+                : webrtcStatus === 'connecting'
+                ? 'P2P Connecting...'
+                : 'P2P Offline'}
             </span>
           </div>
 

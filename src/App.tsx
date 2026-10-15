@@ -19,6 +19,7 @@ import { dbService } from './services/dbService';
 import { syncService } from './services/syncService';
 import { driveService } from './services/driveService';
 import { exportAllDataToExcel } from './services/excelService';
+import { webrtcService } from './services/webrtcService';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState('overview');
@@ -36,6 +37,12 @@ export default function App() {
   const [adhocLessons, setAdhocLessons] = useState([]);
   const [payments, setPayments] = useState([]);
   const [salaries, setSalaries] = useState([]);
+
+  // WebRTC Realtime P2P state
+  const [databaseId, setDatabaseId] = useState(null);
+  const [webrtcStatus, setWebrtcStatus] = useState('disconnected');
+  const [webrtcPeers, setWebrtcPeers] = useState([]);
+  const [webrtcLogs, setWebrtcLogs] = useState([]);
 
   // Theme state
   const [isDarkMode, setIsDarkMode] = useState(() => {
@@ -173,8 +180,15 @@ export default function App() {
         await dbService.init();
 
         if (isMounted) {
+          // Identify or generate unique database ID
+          const dbId = await dbService.getOrCreateDatabaseId();
+          setDatabaseId(dbId);
+
           await reloadData();
           setIsInitializing(false);
+
+          // Connect WebRTC Realtime Sync via Supabase signaling
+          webrtcService.init(dbId);
 
           // Perform Daily Freshness Check against Google Drive
           setTimeout(async () => {
@@ -203,6 +217,47 @@ export default function App() {
       isMounted = false;
     };
   }, [reloadData]);
+
+  // WebRTC P2P Sync Event Listeners
+  useEffect(() => {
+    const unsubStatus = webrtcService.onStatusChange((status) => {
+      setWebrtcStatus(status);
+    });
+    const unsubPeers = webrtcService.onPeersChange((peers) => {
+      setWebrtcPeers(peers);
+    });
+    const unsubLogs = webrtcService.onLogsChange((logs) => {
+      setWebrtcLogs(logs);
+    });
+
+    // When local mutations happen, broadcast to connected WebRTC peers
+    const unsubMutation = dbService.addMutationListener((mutation) => {
+      webrtcService.broadcastMutation(mutation);
+    });
+
+    // When a remote peer streams a mutation to us, refresh local state
+    const unsubRemoteMutation = webrtcService.onRemoteMutation(async () => {
+      await reloadData();
+      showToast('Live database update received from peer', 'info');
+    });
+
+    // When a full peer snapshot is imported
+    const unsubSyncSuccess = webrtcService.onSyncSuccess(async () => {
+      const updatedId = await dbService.getOrCreateDatabaseId();
+      setDatabaseId(updatedId);
+      await reloadData();
+      showToast('Database fully synchronized from peer!', 'success');
+    });
+
+    return () => {
+      unsubStatus();
+      unsubPeers();
+      unsubLogs();
+      unsubMutation();
+      unsubRemoteMutation();
+      unsubSyncSuccess();
+    };
+  }, [reloadData, showToast]);
 
   // Handle Save to Local OPFS ("Save" Button)
   const handleSaveOPFS = async () => {
@@ -265,6 +320,9 @@ export default function App() {
     if (!conflictData) return;
     try {
       await syncService.resolveKeepRemote(conflictData.remoteBytes, conflictData.remoteFile);
+      const newDbId = await dbService.getOrCreateDatabaseId();
+      setDatabaseId(newDbId);
+      webrtcService.init(newDbId);
       showToast('Local database replaced with Google Drive remote copy.', 'success');
       await reloadData();
     } catch (err) {
@@ -289,6 +347,9 @@ export default function App() {
     try {
       await syncService.pullRemoteReplaceLocal();
       setDailyCheckData(null);
+      const newDbId = await dbService.getOrCreateDatabaseId();
+      setDatabaseId(newDbId);
+      webrtcService.init(newDbId);
       showToast('Replaced local database with newer version from Google Drive', 'success');
       await reloadData();
     } catch (err) {
@@ -486,6 +547,8 @@ export default function App() {
         driveConnected={driveConnected}
         isDarkMode={isDarkMode}
         onToggleDarkMode={toggleDarkMode}
+        webrtcStatus={webrtcStatus}
+        webrtcPeers={webrtcPeers}
       />
 
       {/* Main Tab Content */}
@@ -598,6 +661,11 @@ export default function App() {
             driveConnected={driveConnected}
             onRefreshData={reloadData}
             showToast={showToast}
+            databaseId={databaseId}
+            webrtcStatus={webrtcStatus}
+            webrtcPeers={webrtcPeers}
+            webrtcLogs={webrtcLogs}
+            webrtcService={webrtcService}
           />
         )}
       </main>
