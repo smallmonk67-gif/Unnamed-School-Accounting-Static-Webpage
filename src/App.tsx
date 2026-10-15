@@ -95,7 +95,8 @@ export default function App() {
         al,
         sp,
         ts,
-        saveSetting
+        saveSetting,
+        currentDbId
       ] = await Promise.all([
         dbService.getStudents(),
         dbService.getTeachers(),
@@ -107,7 +108,8 @@ export default function App() {
         dbService.getAdhocLessons(),
         dbService.getStudentPayments(),
         dbService.getTeacherSalaries(),
-        dbService.getSetting('last_local_save', null)
+        dbService.getSetting('last_local_save', null),
+        dbService.getOrCreateDatabaseId()
       ]);
 
       setStudents(s);
@@ -122,6 +124,9 @@ export default function App() {
       setSalaries(ts);
       setLastSaveTime(saveSetting);
       setDriveConnected(driveService.isConnected());
+      if (currentDbId) {
+        setDatabaseId(currentDbId);
+      }
     } catch (err) {
       console.error('Failed to load data:', err);
       showToast(`Data load error: ${err.message}`, 'error');

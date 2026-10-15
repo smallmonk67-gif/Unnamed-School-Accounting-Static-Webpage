@@ -27,7 +27,8 @@ import {
   Sliders,
   Copy,
   Check,
-  Terminal
+  Terminal,
+  Link2
 } from 'lucide-react';
 
 export default function SyncBackupTab({ 
@@ -65,6 +66,9 @@ export default function SyncBackupTab({
   const [isP2pEnabled, setIsP2pEnabled] = useState(webrtcService ? webrtcService.isEnabled : true);
   const [isSendingSnapshot, setIsSendingSnapshot] = useState(false);
   const [isRequestingSnapshot, setIsRequestingSnapshot] = useState(false);
+  const [showPairInput, setShowPairInput] = useState(false);
+  const [pairDatabaseId, setPairDatabaseId] = useState('');
+  const [isPairing, setIsPairing] = useState(false);
 
   useEffect(() => {
     setLastSyncIso(localStorage.getItem('last_synced_iso') || '');
@@ -174,6 +178,35 @@ export default function SyncBackupTab({
     setIsCopiedDbId(true);
     showToast('Database Unique ID copied to clipboard', 'info');
     setTimeout(() => setIsCopiedDbId(false), 2500);
+  };
+
+  // Connect to another peer's database room
+  const handleConnectToPeerDatabase = async (e) => {
+    e.preventDefault();
+    const cleanId = pairDatabaseId.trim();
+    if (!cleanId) return;
+    if (cleanId === databaseId) {
+      showToast('Already connected to this Database ID', 'info');
+      return;
+    }
+
+    try {
+      setIsPairing(true);
+      await dbService.setDatabaseId(cleanId);
+      if (webrtcService) {
+        await webrtcService.init(cleanId);
+      }
+      if (onRefreshData) {
+        await onRefreshData();
+      }
+      showToast('Joined database room: ' + cleanId.substring(0, 16) + '... Connecting to peer!', 'success');
+      setShowPairInput(false);
+      setPairDatabaseId('');
+    } catch (err) {
+      showToast('Failed to join database room: ' + err.message, 'error');
+    } finally {
+      setIsPairing(false);
+    }
   };
 
   // Save Supabase Configuration
@@ -430,6 +463,45 @@ export default function SyncBackupTab({
                 {isCopiedDbId ? <Check size={14} className="text-success" /> : <Copy size={14} />}
               </button>
             </div>
+            <div className="flex items-center gap-2 mt-2">
+              <button
+                type="button"
+                className="btn btn-outline btn-xs"
+                onClick={() => setShowPairInput(!showPairInput)}
+                title="Join another device's database room"
+              >
+                <Link2 size={12} className="mr-1 inline" />
+                {showPairInput ? 'Cancel' : 'Pair with Another Device'}
+              </button>
+            </div>
+
+            {showPairInput && (
+              <form onSubmit={handleConnectToPeerDatabase} className="mt-2 p-2 rounded bg-subtle border border-subtle">
+                <label className="text-xs font-semibold text-muted block mb-1">
+                  Enter Peer's Database ID to join their sync room:
+                </label>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    className="form-control text-xs font-mono"
+                    placeholder="db_xxxxxxxx..."
+                    value={pairDatabaseId}
+                    onChange={(e) => setPairDatabaseId(e.target.value)}
+                    required
+                  />
+                  <button
+                    type="submit"
+                    className="btn btn-primary btn-xs whitespace-nowrap"
+                    disabled={isPairing || !pairDatabaseId.trim()}
+                  >
+                    {isPairing ? 'Joining...' : 'Connect & Sync'}
+                  </button>
+                </div>
+                <p className="text-xs text-muted mt-1">
+                  Joining another peer's database room will automatically pull their records to this device.
+                </p>
+              </form>
+            )}
             <p className="text-xs text-muted mt-2">
               Each database file has a cryptographically unique 180+ bit identity. Legacy V1 databases without an ID automatically upgrade to V2 on first open by generating and storing their permanent identity in SQLite.
             </p>

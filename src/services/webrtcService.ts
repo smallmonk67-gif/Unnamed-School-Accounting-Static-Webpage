@@ -57,6 +57,10 @@ class WebRTCService {
     this.remoteMutationListeners = new Set();
     this.logsListeners = new Set();
     this.syncSuccessListeners = new Set();
+
+    // Chunked snapshot transfer state
+    this.incomingSnapshots = new Map();
+    this.isTransferringSnapshot = false;
   }
 
   generatePeerId() {
@@ -428,15 +432,21 @@ class WebRTCService {
 
     peer.dc = dc;
 
-    dc.onopen = () => {
+    dc.onopen = async () => {
       this.log(`DataChannel OPEN with peer ${peerId}. Ready for real-time sync!`, 'success');
       this.notifyPeers();
 
-      // Send initial handshake with database identity confirmation
+      let recordCount = 0;
+      try {
+        recordCount = await dbService.getTotalRecordCount();
+      } catch {}
+
+      // Send initial handshake with database identity confirmation & record count
       this.sendToPeer(peerId, {
         type: 'HANDSHAKE',
         senderPeerId: this.myPeerId,
         databaseId: this.databaseId,
+        recordCount,
         timestamp: Date.now(),
         lastLocalSave: localStorage.getItem('last_local_save') || null
       });
@@ -600,6 +610,35 @@ class WebRTCService {
         }
 
         this.log(`Handshake verified with ${fromPeerId} (DB: ${message.databaseId.substring(0, 16)}...)`, 'success');
+
+        // Instant Auto-Sync on Peer Connect
+        try {
+          const myRecordCount = await dbService.getTotalRecordCount();
+          const remoteRecordCount = message.recordCount || 0;
+          this.log(`Sync check with ${fromPeerId}: Local has ${myRecordCount} records, remote has ${remoteRecordCount} records`, 'info');
+
+          // Case 1: We have data and remote peer has an empty database -> auto push our full snapshot
+          if (myRecordCount > 0 && remoteRecordCount === 0) {
+            this.log(`Remote peer has empty database. Auto-pushing snapshot to ${fromPeerId}...`, 'info');
+            this.sendSnapshotToPeers(fromPeerId);
+          }
+          // Case 2: We have 0 records and remote peer has data -> auto request snapshot
+          else if (myRecordCount === 0 && remoteRecordCount > 0) {
+            this.log(`Local database is empty. Auto-requesting snapshot from ${fromPeerId}...`, 'info');
+            this.requestSnapshotFromPeer(fromPeerId);
+          }
+          // Case 3: Both have records -> compare timestamps if one is newer (>3 seconds)
+          else if (myRecordCount > 0 && remoteRecordCount > 0) {
+            const myLastSave = new Date(localStorage.getItem('last_local_save') || 0).getTime();
+            const remoteLastSave = new Date(message.lastLocalSave || 0).getTime();
+            if (remoteLastSave > 0 && myLastSave > 0 && (remoteLastSave - myLastSave > 3000)) {
+              this.log(`Remote peer has newer database save. Auto-requesting snapshot...`, 'info');
+              this.requestSnapshotFromPeer(fromPeerId);
+            }
+          }
+        } catch (syncErr) {
+          console.warn('Auto-sync check warning:', syncErr);
+        }
         break;
       }
 
@@ -617,63 +656,106 @@ class WebRTCService {
             }
           }
         } catch (err) {
-          this.log(`Failed to apply remote mutation: ${err.message}`, 'error');
+          this.log(`Failed to apply remote mutation: ${err.message}. Self-healing via snapshot...`, 'warning');
+          // Self-heal: If an incremental mutation fails (e.g. FK constraint or missing parent), auto-request full snapshot
+          this.requestSnapshotFromPeer(fromPeerId);
         }
         break;
       }
 
       case 'SNAPSHOT_REQUEST': {
         this.log(`Peer ${fromPeerId} requested full database snapshot`, 'info');
-        try {
-          const binary = await dbService.exportBinary();
-          // Convert to base64
-          let binaryString = '';
-          const len = binary.byteLength;
-          for (let i = 0; i < len; i++) {
-            binaryString += String.fromCharCode(binary[i]);
-          }
-          const base64 = btoa(binaryString);
+        await this.sendSnapshotToPeers(fromPeerId);
+        break;
+      }
 
-          this.sendToPeer(fromPeerId, {
-            type: 'SNAPSHOT_RESPONSE',
-            base64,
-            timestamp: Date.now()
-          });
-          this.log(`Sent full database snapshot to ${fromPeerId} (${Math.round(len / 1024)} KB)`, 'success');
-        } catch (err) {
-          this.log(`Failed to send snapshot: ${err.message}`, 'error');
+      case 'SNAPSHOT_START': {
+        this.incomingSnapshots.set(message.transferId, {
+          chunks: new Array(message.totalChunks),
+          receivedCount: 0,
+          totalChunks: message.totalChunks,
+          byteLength: message.byteLength || 0,
+          fromPeerId
+        });
+        this.log(`Receiving snapshot from ${fromPeerId} (${message.totalChunks} chunks, ~${Math.round((message.byteLength || 0) / 1024)} KB)...`, 'info');
+        break;
+      }
+
+      case 'SNAPSHOT_CHUNK': {
+        const transfer = this.incomingSnapshots.get(message.transferId);
+        if (transfer) {
+          if (!transfer.chunks[message.chunkIndex]) {
+            transfer.chunks[message.chunkIndex] = message.chunk;
+            transfer.receivedCount++;
+          }
+          if (transfer.receivedCount === transfer.totalChunks) {
+            await this.finalizeSnapshotTransfer(message.transferId);
+          }
         }
         break;
       }
 
+      case 'SNAPSHOT_COMPLETE': {
+        if (this.incomingSnapshots.has(message.transferId)) {
+          await this.finalizeSnapshotTransfer(message.transferId);
+        }
+        break;
+      }
+
+      // Legacy fallback in case a single response is received
       case 'SNAPSHOT_RESPONSE': {
-        this.log(`Received full database snapshot from ${fromPeerId}`, 'info');
-        try {
-          const binaryString = atob(message.base64);
-          const len = binaryString.length;
-          const bytes = new Uint8Array(len);
-          for (let i = 0; i < len; i++) {
-            bytes[i] = binaryString.charCodeAt(i);
-          }
-
-          await dbService.importBinary(bytes);
-          this.log(`Imported peer snapshot (${Math.round(len / 1024)} KB) and saved to OPFS!`, 'success');
-
-          for (const cb of this.syncSuccessListeners) {
-            try {
-              cb();
-            } catch (cbErr) {
-              console.error('Sync success callback error:', cbErr);
+        if (message.base64) {
+          try {
+            const binaryString = atob(message.base64);
+            const len = binaryString.length;
+            const bytes = new Uint8Array(len);
+            for (let i = 0; i < len; i++) {
+              bytes[i] = binaryString.charCodeAt(i);
             }
+            await dbService.importBinary(bytes);
+            this.log(`Imported peer snapshot (${Math.round(len / 1024)} KB) and saved to OPFS!`, 'success');
+            for (const cb of this.syncSuccessListeners) {
+              cb();
+            }
+          } catch (err) {
+            this.log(`Failed to import peer snapshot: ${err.message}`, 'error');
           }
-        } catch (err) {
-          this.log(`Failed to import peer snapshot: ${err.message}`, 'error');
         }
         break;
       }
 
       default:
         console.warn('Unknown DataChannel message type:', message.type);
+    }
+  }
+
+  async finalizeSnapshotTransfer(transferId) {
+    const transfer = this.incomingSnapshots.get(transferId);
+    if (!transfer) return;
+    this.incomingSnapshots.delete(transferId);
+
+    try {
+      this.log(`Reassembling ${transfer.receivedCount} chunks...`, 'info');
+      const base64 = transfer.chunks.join('');
+      const binaryString = atob(base64);
+      const len = binaryString.length;
+      const bytes = new Uint8Array(len);
+      for (let i = 0; i < len; i++) {
+        bytes[i] = binaryString.charCodeAt(i);
+      }
+
+      await dbService.importBinary(bytes);
+      this.log(`Successfully imported peer snapshot (${Math.round(len / 1024)} KB) and saved to OPFS!`, 'success');
+
+      for (const cb of this.syncSuccessListeners) {
+        try {
+          cb();
+        } catch (cbErr) {
+          console.error('Sync success callback error:', cbErr);
+        }
+      }
+    } catch (err) {
+      this.log(`Failed to process snapshot: ${err.message}`, 'error');
     }
   }
 
@@ -694,34 +776,92 @@ class WebRTCService {
     return true;
   }
 
-  // Push our full database snapshot to a specific peer (or all connected peers)
+  // Push our full database snapshot to a specific peer (or all connected peers) using safe 16KB chunking
   async sendSnapshotToPeers(peerId = null) {
+    if (this.isTransferringSnapshot) {
+      this.log('Snapshot transfer already in progress, skipping duplicate call', 'warning');
+      return false;
+    }
+
     try {
+      this.isTransferringSnapshot = true;
       const binary = await dbService.exportBinary();
+      if (!binary || binary.byteLength === 0) {
+        throw new Error('Exported binary is empty');
+      }
+
+      // Convert to Base64 safely in memory without stack overflow
       let binaryString = '';
       const len = binary.byteLength;
-      for (let i = 0; i < len; i++) {
-        binaryString += String.fromCharCode(binary[i]);
+      const sliceSize = 8192;
+      for (let i = 0; i < len; i += sliceSize) {
+        const slice = binary.subarray(i, Math.min(i + sliceSize, len));
+        binaryString += String.fromCharCode.apply(null, slice);
       }
       const base64 = btoa(binaryString);
 
-      const payload = {
-        type: 'SNAPSHOT_RESPONSE',
-        base64,
+      const CHUNK_SIZE = 16000; // 16KB chunks (guaranteed within WebRTC DataChannel MTU)
+      const totalChunks = Math.ceil(base64.length / CHUNK_SIZE);
+      const transferId = 'snap_' + Math.random().toString(36).substring(2, 7) + '_' + Date.now().toString(36);
+
+      const startMsg = {
+        type: 'SNAPSHOT_START',
+        transferId,
+        totalChunks,
+        totalBytes: base64.length,
+        byteLength: len,
+        databaseId: this.databaseId,
         timestamp: Date.now()
       };
 
       if (peerId) {
-        this.sendToPeer(peerId, payload);
-        this.log(`Sent snapshot to ${peerId} (${Math.round(len / 1024)} KB)`, 'success');
+        this.sendToPeer(peerId, startMsg);
       } else {
-        const count = this.broadcast(payload);
-        this.log(`Broadcasted snapshot to ${count} peer(s) (${Math.round(len / 1024)} KB)`, 'success');
+        this.broadcast(startMsg);
       }
+
+      // Stream chunks with slight pacing to prevent buffer overflow
+      for (let i = 0; i < totalChunks; i++) {
+        const chunk = base64.substring(i * CHUNK_SIZE, (i + 1) * CHUNK_SIZE);
+        const chunkMsg = {
+          type: 'SNAPSHOT_CHUNK',
+          transferId,
+          chunkIndex: i,
+          totalChunks,
+          chunk
+        };
+
+        if (peerId) {
+          this.sendToPeer(peerId, chunkMsg);
+        } else {
+          this.broadcast(chunkMsg);
+        }
+
+        if (i % 4 === 0) {
+          await new Promise((r) => setTimeout(r, 15));
+        }
+      }
+
+      const completeMsg = {
+        type: 'SNAPSHOT_COMPLETE',
+        transferId,
+        totalChunks
+      };
+
+      if (peerId) {
+        this.sendToPeer(peerId, completeMsg);
+        this.log(`Pushed database snapshot to ${peerId} (${Math.round(len / 1024)} KB in ${totalChunks} chunks)`, 'success');
+      } else {
+        const count = this.broadcast(completeMsg);
+        this.log(`Broadcasted database snapshot to ${count} peer(s) (${Math.round(len / 1024)} KB in ${totalChunks} chunks)`, 'success');
+      }
+
       return true;
     } catch (err) {
       this.log(`Failed to send snapshot: ${err.message}`, 'error');
       return false;
+    } finally {
+      this.isTransferringSnapshot = false;
     }
   }
 }

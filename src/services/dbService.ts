@@ -204,6 +204,33 @@ class DBService {
     return await this.getOrCreateDatabaseId();
   }
 
+  async setDatabaseId(newId) {
+    if (!newId) return;
+    this.cachedDatabaseId = newId;
+    await this.setSetting('database_id', newId);
+    await this.setSetting('database_protocol_version', '2');
+    await this.saveToOPFS();
+  }
+
+  // Get total count of non-deleted user business records
+  async getTotalRecordCount() {
+    try {
+      await this.init();
+      const rows = await this.query(`
+        SELECT 
+          (SELECT COUNT(*) FROM students WHERE deleted_at IS NULL) +
+          (SELECT COUNT(*) FROM teachers WHERE deleted_at IS NULL) +
+          (SELECT COUNT(*) FROM monthly_scheduled_lessons WHERE deleted_at IS NULL) +
+          (SELECT COUNT(*) FROM adhoc_lessons WHERE deleted_at IS NULL) +
+          (SELECT COUNT(*) FROM student_payments WHERE deleted_at IS NULL) +
+          (SELECT COUNT(*) FROM teacher_salaries WHERE deleted_at IS NULL) as total;
+      `);
+      return rows[0]?.total || 0;
+    } catch {
+      return 0;
+    }
+  }
+
   // --- App Settings Helper ---
   async getSetting(key, defaultValue = null) {
     const rows = await this.query(`SELECT value FROM app_settings WHERE key = ?`, [key]);

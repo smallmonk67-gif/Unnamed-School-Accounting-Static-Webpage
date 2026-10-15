@@ -477,53 +477,107 @@ async function mergeRemoteDatabase(remoteBinary) {
   }
 }
 
-// Replace database with a completely new binary (e.g. Keep Remote / Restore)
+// Replace database with a completely new binary (e.g. Keep Remote / Restore / Peer Snapshot)
 async function replaceDatabase(newBinary) {
   if (!sqlite3 || !newBinary) throw new Error('Invalid binary or sqlite not initialized');
+
+  // Allocate typed array in wasm memory and deserialize into a temporary in-memory DB
+  const p = sqlite3.wasm.allocFromTypedArray(newBinary);
+  const tempDb = new sqlite3.oo1.DB();
+  const rc = sqlite3.capi.sqlite3_deserialize(
+    tempDb.pointer,
+    'main',
+    p,
+    newBinary.byteLength,
+    newBinary.byteLength,
+    sqlite3.capi.SQLITE_DESERIALIZE_FREEONCLOSE
+  );
+
+  if (rc !== 0) {
+    try { tempDb.close(); } catch {}
+    throw new Error(`Failed to deserialize snapshot database, rc: ${rc}`);
+  }
+
   try {
-    if (db) {
-      try { db.close(); } catch {}
-    }
-
-    // Save directly to raw OPFS
-    await writeOpfsBinary(OPFS_RAW_NAME, newBinary);
-
-    // Reopen
-    if (sqlite3.oo1 && sqlite3.oo1.OpfsDb && isOpfsVfs) {
-      try {
-        // If OpfsDb, write to file in OPFS
-        db = new sqlite3.oo1.OpfsDb(DB_FILENAME);
-      } catch {
-        const p = sqlite3.wasm.allocFromTypedArray(newBinary);
-        db = new sqlite3.oo1.DB();
-        sqlite3.capi.sqlite3_deserialize(
-          db.pointer,
-          'main',
-          p,
-          newBinary.byteLength,
-          newBinary.byteLength,
-          sqlite3.capi.SQLITE_DESERIALIZE_FREEONCLOSE
-        );
-      }
-    } else {
-      const p = sqlite3.wasm.allocFromTypedArray(newBinary);
-      db = new sqlite3.oo1.DB();
-      sqlite3.capi.sqlite3_deserialize(
-        db.pointer,
-        'main',
-        p,
-        newBinary.byteLength,
-        newBinary.byteLength,
-        sqlite3.capi.SQLITE_DESERIALIZE_FREEONCLOSE
-      );
-    }
+    const tables = [
+      'app_settings',
+      'teacher_categories',
+      'rate_templates',
+      'teachers',
+      'teacher_qualifications',
+      'students',
+      'customized_rates',
+      'monthly_scheduled_lessons',
+      'adhoc_lessons',
+      'student_payments',
+      'teacher_salaries'
+    ];
 
     initSchema(db);
+
+    db.exec('PRAGMA foreign_keys = OFF;');
+    db.exec('BEGIN IMMEDIATE TRANSACTION;');
+
+    for (const table of tables) {
+      // Check if table exists in snapshot
+      const existsInTemp = [];
+      tempDb.exec({
+        sql: `SELECT count(*) as cnt FROM sqlite_master WHERE type='table' AND name='${table}';`,
+        rowMode: 'object',
+        resultRows: existsInTemp
+      });
+
+      if (!existsInTemp[0] || existsInTemp[0].cnt === 0) continue;
+
+      // Delete existing local records
+      db.exec(`DELETE FROM "${table}";`);
+
+      // Read column metadata from snapshot table
+      const colInfo = [];
+      tempDb.exec({
+        sql: `PRAGMA table_info("${table}");`,
+        rowMode: 'object',
+        resultRows: colInfo
+      });
+      if (colInfo.length === 0) continue;
+
+      const colNames = colInfo.map((c) => `"${c.name}"`).join(', ');
+      const placeholders = colInfo.map(() => '?').join(', ');
+
+      // Query all records from snapshot
+      const rows = [];
+      tempDb.exec({
+        sql: `SELECT * FROM "${table}";`,
+        rowMode: 'array',
+        resultRows: rows
+      });
+
+      // Insert all records into local db
+      const insertSql = `INSERT INTO "${table}" (${colNames}) VALUES (${placeholders});`;
+      for (const row of rows) {
+        db.exec({ sql: insertSql, bind: row });
+      }
+    }
+
+    db.exec('COMMIT;');
+    db.exec('PRAGMA foreign_keys = ON;');
+
+    if (isOpfsVfs) {
+      db.exec('PRAGMA wal_checkpoint(FULL);');
+    }
+
     await exportAndFlushToOpfs();
+    console.log('Database successfully replaced with snapshot binary');
     return true;
   } catch (err) {
-    console.error('replaceDatabase error:', err);
+    try { db.exec('ROLLBACK;'); } catch {}
+    try { db.exec('PRAGMA foreign_keys = ON;'); } catch {}
+    console.error('replaceDatabase failed:', err);
     throw err;
+  } finally {
+    try {
+      tempDb.close();
+    } catch {}
   }
 }
 
