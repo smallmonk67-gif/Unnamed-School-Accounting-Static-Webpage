@@ -480,7 +480,7 @@ export default function SyncBackupTab({
           </div>
 
           {/* P2P Snapshot Actions */}
-          <div className="grid-2-cols gap-2 mt-4">
+          <div className="p2p-actions-grid mt-4">
             <button
               type="button"
               className="btn btn-secondary btn-block text-xs"

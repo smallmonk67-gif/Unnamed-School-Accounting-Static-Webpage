@@ -4,7 +4,9 @@ import { dbService } from './dbService';
 
 // Obfuscated default credentials
 const DEFAULT_SUPABASE_URL_ENC = 'aHR0cHM6Ly9janV3c3p4eHhpcmt5ZndncWFzci5zdXBhYmFzZS5jbw==';
-const DEFAULT_SUPABASE_KEY_ENC = 'c2JfcHVibGlzaGFibGVfQjZVNUpkbWVmM0x6YWpaaEU1Q0R1QV9rZTdGck5sdg==';
+// Correct Base64 encoding of sb_publishable_B6W5Jdmef3LZajZhE5CDuA_ke7FrNlv
+const DEFAULT_SUPABASE_KEY_ENC = 'c2JfcHVibGlzaGFibGVfQjZXNUpkbWVmM0xaYWpaaEU1Q0R1QV9rZTdGck5sdg==';
+const BAD_TYPO_KEY = 'sb_publishable_B6U5Jdmef3LzajZhE5CDuA_ke7FrNlv';
 
 function decodeKey(enc) {
   try {
@@ -80,8 +82,15 @@ class WebRTCService {
     const encUrl = localStorage.getItem('supabase_url_enc');
     const encKey = localStorage.getItem('supabase_anon_key_enc');
 
-    const storedUrl = encUrl ? decodeKey(encUrl) : localStorage.getItem('supabase_url');
-    const storedKey = encKey ? decodeKey(encKey) : localStorage.getItem('supabase_anon_key');
+    let storedUrl = encUrl ? decodeKey(encUrl) : localStorage.getItem('supabase_url');
+    let storedKey = encKey ? decodeKey(encKey) : localStorage.getItem('supabase_anon_key');
+
+    // Purge bad typo key if previously persisted in localStorage
+    if (storedKey === BAD_TYPO_KEY) {
+      localStorage.removeItem('supabase_anon_key_enc');
+      localStorage.removeItem('supabase_anon_key');
+      storedKey = null;
+    }
 
     return {
       url: storedUrl || envUrl || decodeKey(DEFAULT_SUPABASE_URL_ENC),
