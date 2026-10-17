@@ -47,6 +47,7 @@ export default function PaymentsTab({
     receipt_no: '',
     notes: ''
   });
+  const [touchedFields, setTouchedFields] = useState({});
   const [formError, setFormError] = useState('');
 
   // Handle prefilled student from Students tab
@@ -79,6 +80,7 @@ export default function PaymentsTab({
       notes: ''
     });
     setFormError('');
+    setTouchedFields({});
     setIsModalOpen(true);
   };
 
@@ -112,6 +114,8 @@ export default function PaymentsTab({
       monthly_lesson_id: defaultLesson ? defaultLesson.id : '',
       amount_paid: defaultAmount
     });
+    setTouchedFields(prev => ({ ...prev, student_id: true, monthly_lesson_id: true, amount_paid: true }));
+    setTouchedFields(prev => ({ ...prev, student_id: true, monthly_lesson_id: true, amount_paid: true }));
   };
 
   const handleLessonChange = (lessonId) => {
@@ -122,6 +126,8 @@ export default function PaymentsTab({
         monthly_lesson_id: lesson.id,
         amount_paid: Number(lesson.monthly_student_fee)
       });
+    setTouchedFields(prev => ({ ...prev, monthly_lesson_id: true, amount_paid: true }));
+    setTouchedFields(prev => ({ ...prev, monthly_lesson_id: true, amount_paid: true }));
     }
   };
 
@@ -133,7 +139,14 @@ export default function PaymentsTab({
         adhoc_lesson_id: adhoc.id,
         amount_paid: Number(adhoc.student_fee)
       });
+    setTouchedFields(prev => ({ ...prev, adhoc_lesson_id: true, amount_paid: true }));
+    setTouchedFields(prev => ({ ...prev, adhoc_lesson_id: true, amount_paid: true }));
     }
+  };
+
+  const handleFieldChange = (field, value) => {
+    setPaymentForm(prev => ({ ...prev, [field]: value }));
+    setTouchedFields(prev => ({ ...prev, [field]: true }));
   };
 
   const handleSubmit = async (e) => {
@@ -180,6 +193,32 @@ export default function PaymentsTab({
   const selectedStudentAdhocs = adhocLessons.filter(
     a => a.student_id === paymentForm.student_id
   );
+
+
+
+  // WebRTC Merge Effect for paymentForm
+  React.useEffect(() => {
+    if (isModalOpen && editingPayment) {
+      const updatedItem = payments.find(item => item.id === editingPayment.id);
+      if (updatedItem) {
+        setPaymentForm(prev => {
+          const newData = { ...prev };
+          let hasChanges = false;
+          const fields = ["student_id","payment_date","amount_paid","payment_type","billing_period","monthly_lesson_id","adhoc_lesson_id","payment_method","receipt_no","notes"];
+          for (const field of fields) {
+            if (!touchedFields[field] && updatedItem[field] !== undefined && updatedItem[field] !== null) {
+              const remoteValue = updatedItem[field];
+              if (newData[field] !== remoteValue) {
+                newData[field] = remoteValue;
+                hasChanges = true;
+              }
+            }
+          }
+          return hasChanges ? newData : prev;
+        });
+      }
+    }
+  }, [payments, isModalOpen, editingPayment, touchedFields]);
 
   return (
     <div className="tab-pane-content">
@@ -363,7 +402,7 @@ export default function PaymentsTab({
               <select
                 className="form-control"
                 value={paymentForm.payment_type}
-                onChange={(e) => setPaymentForm({ ...paymentForm, payment_type: e.target.value })}
+                onChange={(e) => handleFieldChange('payment_type', e.target.value)}
               >
                 <option value="monthly_lesson">Monthly Lesson Fee</option>
                 <option value="adhoc_lesson">Adhoc Lesson Fee</option>
@@ -397,7 +436,7 @@ export default function PaymentsTab({
                   type="month"
                   className="form-control"
                   value={paymentForm.billing_period}
-                  onChange={(e) => setPaymentForm({ ...paymentForm, billing_period: e.target.value })}
+                  onChange={(e) => handleFieldChange('billing_period', e.target.value)}
                 />
               </div>
             </div>
@@ -435,7 +474,7 @@ export default function PaymentsTab({
                 className="form-control"
                 required
                 value={paymentForm.amount_paid}
-                onChange={(e) => setPaymentForm({ ...paymentForm, amount_paid: e.target.value })}
+                onChange={(e) => handleFieldChange('amount_paid', e.target.value)}
               />
             </div>
 
@@ -446,7 +485,7 @@ export default function PaymentsTab({
                 className="form-control"
                 required
                 value={paymentForm.payment_date}
-                onChange={(e) => setPaymentForm({ ...paymentForm, payment_date: e.target.value })}
+                onChange={(e) => handleFieldChange('payment_date', e.target.value)}
               />
             </div>
           </div>
@@ -457,7 +496,7 @@ export default function PaymentsTab({
               <select
                 className="form-control"
                 value={paymentForm.payment_method}
-                onChange={(e) => setPaymentForm({ ...paymentForm, payment_method: e.target.value })}
+                onChange={(e) => handleFieldChange('payment_method', e.target.value)}
               >
                 <option value="Cash">Cash</option>
                 <option value="Bank Transfer">Bank Transfer</option>
@@ -474,7 +513,7 @@ export default function PaymentsTab({
                 className="form-control"
                 placeholder="e.g. RCP-102938"
                 value={paymentForm.receipt_no}
-                onChange={(e) => setPaymentForm({ ...paymentForm, receipt_no: e.target.value })}
+                onChange={(e) => handleFieldChange('receipt_no', e.target.value)}
               />
             </div>
           </div>
@@ -486,7 +525,7 @@ export default function PaymentsTab({
               className="form-control"
               placeholder="e.g. Paid in full for October lesson bundle"
               value={paymentForm.notes}
-              onChange={(e) => setPaymentForm({ ...paymentForm, notes: e.target.value })}
+              onChange={(e) => handleFieldChange('notes', e.target.value)}
             />
           </div>
 

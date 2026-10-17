@@ -42,6 +42,7 @@ export default function StudentsTab({
     emergency_contact: '',
     status: 'active'
   });
+  const [touchedFields, setTouchedFields] = useState({});
   const [formError, setFormError] = useState('');
 
   const openCreateModal = () => {
@@ -58,6 +59,7 @@ export default function StudentsTab({
       status: 'active'
     });
     setFormError('');
+    setTouchedFields({});
     setIsModalOpen(true);
   };
 
@@ -76,6 +78,11 @@ export default function StudentsTab({
     });
     setFormError('');
     setIsModalOpen(true);
+  };
+
+  const handleFieldChange = (field, value) => {
+    setFormData(prev => ({ ...prev, [field]: value }));
+    setTouchedFields(prev => ({ ...prev, [field]: true }));
   };
 
   const handleSubmit = async (e) => {
@@ -120,6 +127,30 @@ export default function StudentsTab({
       (s.preferred_name && s.preferred_name.toLowerCase().includes(term))
     );
   });
+
+  // WebRTC Merge Effect for formData
+  React.useEffect(() => {
+    if (isModalOpen && editingStudent) {
+      const updatedItem = students.find(item => item.id === editingStudent.id);
+      if (updatedItem) {
+        setFormData(prev => {
+          const newData = { ...prev };
+          let hasChanges = false;
+          const fields = ["ic","full_name","preferred_name","birthday","phone","email","emergency_contact","status"];
+          for (const field of fields) {
+            if (!touchedFields[field] && updatedItem[field] !== undefined && updatedItem[field] !== null) {
+              const remoteValue = updatedItem[field];
+              if (newData[field] !== remoteValue) {
+                newData[field] = remoteValue;
+                hasChanges = true;
+              }
+            }
+          }
+          return hasChanges ? newData : prev;
+        });
+      }
+    }
+  }, [students, isModalOpen, editingStudent, touchedFields]);
 
   return (
     <div className="tab-pane-content">
@@ -252,7 +283,7 @@ export default function StudentsTab({
                 placeholder="e.g. 050312-10-5432"
                 required
                 value={formData.ic}
-                onChange={(e) => setFormData({ ...formData, ic: e.target.value })}
+                onChange={(e) => handleFieldChange('ic', e.target.value)}
               />
             </div>
             <div className="form-group">
@@ -262,7 +293,7 @@ export default function StudentsTab({
                 className="form-control"
                 required
                 value={formData.birthday}
-                onChange={(e) => setFormData({ ...formData, birthday: e.target.value })}
+                onChange={(e) => handleFieldChange('birthday', e.target.value)}
               />
             </div>
           </div>
@@ -276,7 +307,7 @@ export default function StudentsTab({
                 placeholder="e.g. Tan Mei Ling"
                 required
                 value={formData.full_name}
-                onChange={(e) => setFormData({ ...formData, full_name: e.target.value })}
+                onChange={(e) => handleFieldChange('full_name', e.target.value)}
               />
             </div>
             <div className="form-group">
@@ -286,7 +317,7 @@ export default function StudentsTab({
                 className="form-control"
                 placeholder="e.g. May Tan"
                 value={formData.preferred_name}
-                onChange={(e) => setFormData({ ...formData, preferred_name: e.target.value })}
+                onChange={(e) => handleFieldChange('preferred_name', e.target.value)}
               />
             </div>
           </div>
@@ -299,7 +330,7 @@ export default function StudentsTab({
                 className="form-control"
                 placeholder="e.g. +60 12-345 6789"
                 value={formData.phone}
-                onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                onChange={(e) => handleFieldChange('phone', e.target.value)}
               />
             </div>
             <div className="form-group">
@@ -309,7 +340,7 @@ export default function StudentsTab({
                 className="form-control"
                 placeholder="student@example.com"
                 value={formData.email}
-                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                onChange={(e) => handleFieldChange('email', e.target.value)}
               />
             </div>
           </div>
@@ -322,7 +353,7 @@ export default function StudentsTab({
                 className="form-control"
                 placeholder="e.g. Mother: 012-9876543"
                 value={formData.emergency_contact}
-                onChange={(e) => setFormData({ ...formData, emergency_contact: e.target.value })}
+                onChange={(e) => handleFieldChange('emergency_contact', e.target.value)}
               />
             </div>
             <div className="form-group">
@@ -330,7 +361,7 @@ export default function StudentsTab({
               <select
                 className="form-control"
                 value={formData.status}
-                onChange={(e) => setFormData({ ...formData, status: e.target.value })}
+                onChange={(e) => handleFieldChange('status', e.target.value)}
               >
                 <option value="active">Active</option>
                 <option value="inactive">Inactive</option>

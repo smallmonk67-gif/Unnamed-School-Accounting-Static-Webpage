@@ -37,6 +37,7 @@ export default function RateTemplatesTab({
     instrument: 'Piano',
     certificate: ''
   });
+  const [touchedCatFields, setTouchedCatFields] = useState({});
   const [catError, setCatError] = useState('');
 
   // Rate Template Modal State
@@ -51,6 +52,7 @@ export default function RateTemplatesTab({
     default_student_fee: 170,
     default_teacher_rate: 100
   });
+  const [touchedTplFields, setTouchedTplFields] = useState({});
   const [tplError, setTplError] = useState('');
 
   // Customized Rate Modal State
@@ -66,6 +68,7 @@ export default function RateTemplatesTab({
     custom_teacher_rate: 90,
     notes: ''
   });
+  const [touchedCustomFields, setTouchedCustomFields] = useState({});
   const [customError, setCustomError] = useState('');
 
   // --- Category Handlers ---
@@ -78,6 +81,7 @@ export default function RateTemplatesTab({
       certificate: ''
     });
     setCatError('');
+    setTouchedCatFields({});
     setIsCatModalOpen(true);
   };
 
@@ -90,7 +94,23 @@ export default function RateTemplatesTab({
       certificate: cat.certificate
     });
     setCatError('');
+    setTouchedCatFields({});
     setIsCatModalOpen(true);
+  };
+
+  const handleCatFieldChange = (field, value) => {
+    setCatForm(prev => ({ ...prev, [field]: value }));
+    setTouchedCatFields(prev => ({ ...prev, [field]: true }));
+  };
+
+  const handleTplFieldChange = (field, value) => {
+    setTplForm(prev => ({ ...prev, [field]: value }));
+    setTouchedTplFields(prev => ({ ...prev, [field]: true }));
+  };
+
+  const handleCustomFieldChange = (field, value) => {
+    setCustomForm(prev => ({ ...prev, [field]: value }));
+    setTouchedCustomFields(prev => ({ ...prev, [field]: true }));
   };
 
   const handleCatSubmit = async (e) => {
@@ -127,6 +147,7 @@ export default function RateTemplatesTab({
       default_teacher_rate: 100
     });
     setTplError('');
+    setTouchedTplFields({});
     setIsTplModalOpen(true);
   };
 
@@ -141,6 +162,7 @@ export default function RateTemplatesTab({
       default_teacher_rate: Number(tpl.default_teacher_rate)
     });
     setTplError('');
+    setTouchedTplFields({});
     setIsTplModalOpen(true);
   };
 
@@ -173,6 +195,7 @@ export default function RateTemplatesTab({
       notes: ''
     });
     setCustomError('');
+    setTouchedCustomFields({});
     setIsCustomModalOpen(true);
   };
 
@@ -189,6 +212,7 @@ export default function RateTemplatesTab({
       notes: cr.notes || ''
     });
     setCustomError('');
+    setTouchedCustomFields({});
     setIsCustomModalOpen(true);
   };
 
@@ -222,6 +246,78 @@ export default function RateTemplatesTab({
     'Beginner', 'Grade 1', 'Grade 2', 'Grade 3', 'Grade 4', 
     'Grade 5', 'Grade 6', 'Grade 7', 'Grade 8', 'Diploma'
   ];
+
+  // WebRTC Merge Effect for catForm
+  React.useEffect(() => {
+    if (isCatModalOpen && editingCategory) {
+      const updatedItem = categories.find(item => item.id === editingCategory.id);
+      if (updatedItem) {
+        setCatForm(prev => {
+          const newData = { ...prev };
+          let hasChanges = false;
+          const fields = ["name", "instrument", "certificate"];
+          for (const field of fields) {
+            if (!touchedCatFields[field] && updatedItem[field] !== undefined && updatedItem[field] !== null) {
+              const remoteValue = updatedItem[field];
+              if (newData[field] !== remoteValue) {
+                newData[field] = remoteValue;
+                hasChanges = true;
+              }
+            }
+          }
+          return hasChanges ? newData : prev;
+        });
+      }
+    }
+  }, [categories, isCatModalOpen, editingCategory, touchedCatFields]);
+
+  // WebRTC Merge Effect for tplForm
+  React.useEffect(() => {
+    if (isTplModalOpen && editingTemplate) {
+      const updatedItem = rateTemplates.find(item => item.id === editingTemplate.id);
+      if (updatedItem) {
+        setTplForm(prev => {
+          const newData = { ...prev };
+          let hasChanges = false;
+          const fields = ["category_id","grade","duration_minutes","default_student_fee","default_teacher_rate"];
+          for (const field of fields) {
+            if (!touchedTplFields[field] && updatedItem[field] !== undefined && updatedItem[field] !== null) {
+              const remoteValue = updatedItem[field];
+              if (newData[field] !== remoteValue) {
+                newData[field] = remoteValue;
+                hasChanges = true;
+              }
+            }
+          }
+          return hasChanges ? newData : prev;
+        });
+      }
+    }
+  }, [rateTemplates, isTplModalOpen, editingTemplate, touchedTplFields]);
+
+  // WebRTC Merge Effect for customForm
+  React.useEffect(() => {
+    if (isCustomModalOpen && editingCustomRate) {
+      const updatedItem = customizedRates.find(item => item.id === editingCustomRate.id);
+      if (updatedItem) {
+        setCustomForm(prev => {
+          const newData = { ...prev };
+          let hasChanges = false;
+          const fields = ["teacher_id","student_id","instrument","duration_minutes","custom_student_fee","custom_teacher_rate","notes"];
+          for (const field of fields) {
+            if (!touchedCustomFields[field] && updatedItem[field] !== undefined && updatedItem[field] !== null) {
+              const remoteValue = updatedItem[field];
+              if (newData[field] !== remoteValue) {
+                newData[field] = remoteValue;
+                hasChanges = true;
+              }
+            }
+          }
+          return hasChanges ? newData : prev;
+        });
+      }
+    }
+  }, [customizedRates, isCustomModalOpen, editingCustomRate, touchedCustomFields]);
 
   return (
     <div className="tab-pane-content">
@@ -523,7 +619,7 @@ export default function RateTemplatesTab({
               placeholder="e.g. Senior Piano Specialist"
               required
               value={catForm.name}
-              onChange={(e) => setCatForm({ ...catForm, name: e.target.value })}
+              onChange={(e) => handleCatFieldChange('name', e.target.value)}
             />
           </div>
 
@@ -535,7 +631,7 @@ export default function RateTemplatesTab({
               placeholder="e.g. Piano, Violin, Vocal"
               required
               value={catForm.instrument}
-              onChange={(e) => setCatForm({ ...catForm, instrument: e.target.value })}
+              onChange={(e) => handleCatFieldChange('instrument', e.target.value)}
             />
           </div>
 
@@ -547,7 +643,7 @@ export default function RateTemplatesTab({
               placeholder="e.g. Trinity ATCL, ABRSM Grade 8"
               required
               value={catForm.certificate}
-              onChange={(e) => setCatForm({ ...catForm, certificate: e.target.value })}
+              onChange={(e) => handleCatFieldChange('certificate', e.target.value)}
             />
           </div>
 
@@ -578,7 +674,7 @@ export default function RateTemplatesTab({
               className="form-control"
               required
               value={tplForm.category_id}
-              onChange={(e) => setTplForm({ ...tplForm, category_id: e.target.value })}
+              onChange={(e) => handleTplFieldChange('category_id', e.target.value)}
             >
               <option value="">-- Select Category --</option>
               {categories.map((c) => (
@@ -596,7 +692,7 @@ export default function RateTemplatesTab({
                 className="form-control"
                 required
                 value={tplForm.grade}
-                onChange={(e) => setTplForm({ ...tplForm, grade: e.target.value })}
+                onChange={(e) => handleTplFieldChange('grade', e.target.value)}
               >
                 {gradesList.map((g) => (
                   <option key={g} value={g}>{g}</option>
@@ -610,7 +706,7 @@ export default function RateTemplatesTab({
                 className="form-control"
                 required
                 value={tplForm.duration_minutes}
-                onChange={(e) => setTplForm({ ...tplForm, duration_minutes: Number(e.target.value) })}
+                onChange={(e) => handleTplFieldChange('duration_minutes', Number(e.target.value))}
               >
                 <option value={30}>30 Minutes</option>
                 <option value={45}>45 Minutes</option>
@@ -629,7 +725,7 @@ export default function RateTemplatesTab({
                 className="form-control"
                 required
                 value={tplForm.default_student_fee}
-                onChange={(e) => setTplForm({ ...tplForm, default_student_fee: e.target.value })}
+                onChange={(e) => handleTplFieldChange('default_student_fee', e.target.value)}
               />
             </div>
 
@@ -642,7 +738,7 @@ export default function RateTemplatesTab({
                 className="form-control"
                 required
                 value={tplForm.default_teacher_rate}
-                onChange={(e) => setTplForm({ ...tplForm, default_teacher_rate: e.target.value })}
+                onChange={(e) => handleTplFieldChange('default_teacher_rate', e.target.value)}
               />
             </div>
           </div>
@@ -675,7 +771,7 @@ export default function RateTemplatesTab({
                 className="form-control"
                 required
                 value={customForm.student_id}
-                onChange={(e) => setCustomForm({ ...customForm, student_id: e.target.value })}
+                onChange={(e) => handleCustomFieldChange('student_id', e.target.value)}
               >
                 <option value="">-- Select Student --</option>
                 {students.map((s) => (
@@ -692,7 +788,7 @@ export default function RateTemplatesTab({
                 className="form-control"
                 required
                 value={customForm.teacher_id}
-                onChange={(e) => setCustomForm({ ...customForm, teacher_id: e.target.value })}
+                onChange={(e) => handleCustomFieldChange('teacher_id', e.target.value)}
               >
                 <option value="">-- Select Teacher --</option>
                 {teachers.map((t) => (
@@ -713,7 +809,7 @@ export default function RateTemplatesTab({
                 placeholder="e.g. Piano, Violin"
                 required
                 value={customForm.instrument}
-                onChange={(e) => setCustomForm({ ...customForm, instrument: e.target.value })}
+                onChange={(e) => handleCustomFieldChange('instrument', e.target.value)}
               />
             </div>
 
@@ -723,7 +819,7 @@ export default function RateTemplatesTab({
                 className="form-control"
                 required
                 value={customForm.duration_minutes}
-                onChange={(e) => setCustomForm({ ...customForm, duration_minutes: Number(e.target.value) })}
+                onChange={(e) => handleCustomFieldChange('duration_minutes', Number(e.target.value))}
               >
                 <option value={30}>30 Minutes</option>
                 <option value={45}>45 Minutes</option>
@@ -742,7 +838,7 @@ export default function RateTemplatesTab({
                 className="form-control"
                 required
                 value={customForm.custom_student_fee}
-                onChange={(e) => setCustomForm({ ...customForm, custom_student_fee: e.target.value })}
+                onChange={(e) => handleCustomFieldChange('custom_student_fee', e.target.value)}
               />
             </div>
 
@@ -755,7 +851,7 @@ export default function RateTemplatesTab({
                 className="form-control"
                 required
                 value={customForm.custom_teacher_rate}
-                onChange={(e) => setCustomForm({ ...customForm, custom_teacher_rate: e.target.value })}
+                onChange={(e) => handleCustomFieldChange('custom_teacher_rate', e.target.value)}
               />
             </div>
           </div>
@@ -767,7 +863,7 @@ export default function RateTemplatesTab({
               className="form-control"
               placeholder="e.g. Sibling discount / special scholarship"
               value={customForm.notes}
-              onChange={(e) => setCustomForm({ ...customForm, notes: e.target.value })}
+              onChange={(e) => handleCustomFieldChange('notes', e.target.value)}
             />
           </div>
 
