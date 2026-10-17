@@ -58,6 +58,11 @@ Built with **React**, **SQLite WASM** backed by the browser's **Origin Private F
      - *Sheet 8*: Rate Templates Matrix
      - *Sheet 9*: Customized Rate Overrides
 
+9. **Live WebRTC Peer-to-Peer Database Sync**
+   - Real-time synchronization of database mutations across multiple devices.
+   - Uses **Supabase Realtime Broadcast and Presence** for WebRTC signaling over WebSockets.
+   - **No backend database or migrations required**: Supabase is used strictly as a signaling server to connect peers directly. All data remains in the local OPFS database.
+
 ---
 
 ## 💾 Storage & Google Drive Cloud Synchronization
@@ -121,6 +126,21 @@ To enable Google Drive sync:
 
 ---
 
+## ⚡ Supabase Cloud Signaling Setup
+
+To enable WebRTC real-time peer-to-peer sync, you can configure your own Supabase project for signaling.
+
+1. Create a free project on [Supabase](https://supabase.com/).
+2. You **do not** need to create any database tables or configure PostgreSQL.
+3. In your Supabase project dashboard, navigate to **Project Settings > API**.
+4. Locate your **Project URL** and your **Project API Key (anon/public)**.
+5. In the Unnamed School Accounting Webpage, navigate to the **Sync & Backup** tab.
+6. Click on **Configure / View Cloud Signaling Keys** under the Supabase Cloud Signaling section.
+7. Enter your **Project URL** and **Publishable / Anon Key** into the input fields.
+8. Click **Save Keys & Reconnect**. The application will now use your Supabase project to establish WebRTC connections between your devices.
+
+---
+
 ## 🛠️ Development
 
 Run the local Vite dev server:
@@ -128,3 +148,9 @@ Run the local Vite dev server:
 pnpm run dev
 ```
 Open `http://localhost:5173/` in your browser.
+
+---
+
+## 🤖 AI Disclaimer
+
+This project was built by Google Jules and Google Antigravity IDE.
