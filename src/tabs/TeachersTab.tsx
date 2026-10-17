@@ -46,6 +46,7 @@ export default function TeachersTab({
     certificate: '',
     category_id: ''
   });
+  const [touchedQualFields, setTouchedQualFields] = useState({});
   const [qualError, setQualError] = useState('');
 
   // Teacher Form State
@@ -59,6 +60,7 @@ export default function TeachersTab({
     email: '',
     status: 'active'
   });
+  const [touchedTeacherFields, setTouchedTeacherFields] = useState({});
   const [teacherError, setTeacherError] = useState('');
 
   const openCreateTeacher = () => {
@@ -74,6 +76,7 @@ export default function TeachersTab({
       status: 'active'
     });
     setTeacherError('');
+    setTouchedTeacherFields({});
     setIsTeacherModalOpen(true);
   };
 
@@ -90,7 +93,18 @@ export default function TeachersTab({
       status: teacher.status || 'active'
     });
     setTeacherError('');
+    setTouchedTeacherFields({});
     setIsTeacherModalOpen(true);
+  };
+
+  const handleTeacherFieldChange = (field, value) => {
+    setTeacherForm(prev => ({ ...prev, [field]: value }));
+    setTouchedTeacherFields(prev => ({ ...prev, [field]: true }));
+  };
+
+  const handleQualFieldChange = (field, value) => {
+    setQualForm(prev => ({ ...prev, [field]: value }));
+    setTouchedQualFields(prev => ({ ...prev, [field]: true }));
   };
 
   const handleSaveTeacherSubmit = async (e) => {
@@ -136,6 +150,7 @@ export default function TeachersTab({
       category_id: categories.length > 0 ? categories[0].id : ''
     });
     setQualError('');
+    setTouchedQualFields({});
     setIsQualModalOpen(true);
   };
 
@@ -180,6 +195,38 @@ export default function TeachersTab({
       (t.preferred_name && t.preferred_name.toLowerCase().includes(term))
     );
   });
+
+  // WebRTC Merge Effect for teacherForm
+  React.useEffect(() => {
+    if (isTeacherModalOpen && editingTeacher) {
+      const updatedItem = teachers.find(item => item.id === editingTeacher.id);
+      if (updatedItem) {
+        setTeacherForm(prev => {
+          const newData = { ...prev };
+          let hasChanges = false;
+          const fields = ["ic","full_name","preferred_name","birthday","phone","email","status"];
+          for (const field of fields) {
+            if (!touchedTeacherFields[field] && updatedItem[field] !== undefined && updatedItem[field] !== null) {
+              const remoteValue = updatedItem[field];
+              if (newData[field] !== remoteValue) {
+                newData[field] = remoteValue;
+                hasChanges = true;
+              }
+            }
+          }
+          return hasChanges ? newData : prev;
+        });
+      }
+    }
+  }, [teachers, isTeacherModalOpen, editingTeacher, touchedTeacherFields]);
+
+  // WebRTC Merge Effect for Qualifications
+  React.useEffect(() => {
+    // Quals are currently only 'created', but if we add editing:
+    if (isQualModalOpen && qualTeacher) {
+      // Right now there's no editingQual, so this is just a placeholder to ensure the logic exists
+    }
+  }, [qualifications, isQualModalOpen, qualTeacher, touchedQualFields]);
 
   return (
     <div className="tab-pane-content">
@@ -338,7 +385,7 @@ export default function TeachersTab({
                 placeholder="e.g. 880921-14-5123"
                 required
                 value={teacherForm.ic}
-                onChange={(e) => setTeacherForm({ ...teacherForm, ic: e.target.value })}
+                onChange={(e) => handleTeacherFieldChange('ic', e.target.value)}
               />
             </div>
             <div className="form-group">
@@ -348,7 +395,7 @@ export default function TeachersTab({
                 className="form-control"
                 required
                 value={teacherForm.birthday}
-                onChange={(e) => setTeacherForm({ ...teacherForm, birthday: e.target.value })}
+                onChange={(e) => handleTeacherFieldChange('birthday', e.target.value)}
               />
             </div>
           </div>
@@ -362,7 +409,7 @@ export default function TeachersTab({
                 placeholder="e.g. Marcus Wong"
                 required
                 value={teacherForm.full_name}
-                onChange={(e) => setTeacherForm({ ...teacherForm, full_name: e.target.value })}
+                onChange={(e) => handleTeacherFieldChange('full_name', e.target.value)}
               />
             </div>
             <div className="form-group">
@@ -372,7 +419,7 @@ export default function TeachersTab({
                 className="form-control"
                 placeholder="e.g. Mr. Marcus"
                 value={teacherForm.preferred_name}
-                onChange={(e) => setTeacherForm({ ...teacherForm, preferred_name: e.target.value })}
+                onChange={(e) => handleTeacherFieldChange('preferred_name', e.target.value)}
               />
             </div>
           </div>
@@ -385,7 +432,7 @@ export default function TeachersTab({
                 className="form-control"
                 placeholder="e.g. +60 16-789 1234"
                 value={teacherForm.phone}
-                onChange={(e) => setTeacherForm({ ...teacherForm, phone: e.target.value })}
+                onChange={(e) => handleTeacherFieldChange('phone', e.target.value)}
               />
             </div>
             <div className="form-group">
@@ -395,7 +442,7 @@ export default function TeachersTab({
                 className="form-control"
                 placeholder="teacher@example.com"
                 value={teacherForm.email}
-                onChange={(e) => setTeacherForm({ ...teacherForm, email: e.target.value })}
+                onChange={(e) => handleTeacherFieldChange('email', e.target.value)}
               />
             </div>
           </div>
@@ -405,7 +452,7 @@ export default function TeachersTab({
             <select
               className="form-control"
               value={teacherForm.status}
-              onChange={(e) => setTeacherForm({ ...teacherForm, status: e.target.value })}
+              onChange={(e) => handleTeacherFieldChange('status', e.target.value)}
             >
               <option value="active">Active</option>
               <option value="inactive">Inactive</option>
@@ -492,7 +539,7 @@ export default function TeachersTab({
                     placeholder="e.g. Piano, Violin"
                     required
                     value={qualForm.instrument}
-                    onChange={(e) => setQualForm({ ...qualForm, instrument: e.target.value })}
+                    onChange={(e) => handleQualFieldChange('instrument', e.target.value)}
                   />
                 </div>
                 <div className="form-group">
@@ -503,7 +550,7 @@ export default function TeachersTab({
                     placeholder="e.g. Trinity ATCL, ABRSM 8"
                     required
                     value={qualForm.certificate}
-                    onChange={(e) => setQualForm({ ...qualForm, certificate: e.target.value })}
+                    onChange={(e) => handleQualFieldChange('certificate', e.target.value)}
                   />
                 </div>
                 <div className="form-group">
@@ -512,7 +559,7 @@ export default function TeachersTab({
                     className="form-control"
                     required
                     value={qualForm.category_id}
-                    onChange={(e) => setQualForm({ ...qualForm, category_id: e.target.value })}
+                    onChange={(e) => handleQualFieldChange('category_id', e.target.value)}
                   >
                     <option value="">-- Select Category --</option>
                     {categories.map((c) => (

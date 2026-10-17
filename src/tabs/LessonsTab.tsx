@@ -54,6 +54,7 @@ export default function LessonsTab({
     end_date: '',
     status: 'active'
   });
+  const [touchedMonthlyFields, setTouchedMonthlyFields] = useState({});
   const [resolvedRateInfo, setResolvedRateInfo] = useState('');
   const [monthlyError, setMonthlyError] = useState('');
 
@@ -73,6 +74,7 @@ export default function LessonsTab({
     status: 'scheduled',
     notes: ''
   });
+  const [touchedAdhocFields, setTouchedAdhocFields] = useState({});
   const [adhocError, setAdhocError] = useState('');
 
   // Handle external edit trigger from overview timetable
@@ -109,6 +111,7 @@ export default function LessonsTab({
       status: 'active'
     });
     setMonthlyError('');
+    setTouchedMonthlyFields({});
     setIsMonthlyModalOpen(true);
     triggerAutoRateLookup(initialStudentId, initialTeacherId, initialInstrument, 'Grade 1', 45);
   };
@@ -135,6 +138,7 @@ export default function LessonsTab({
     });
     setResolvedRateInfo(lesson.is_custom_rate ? 'Custom Rate Applied' : 'Standard Template Rate');
     setMonthlyError('');
+    setTouchedMonthlyFields({});
     setIsMonthlyModalOpen(true);
   };
 
@@ -163,6 +167,16 @@ export default function LessonsTab({
     } catch (err) {
       console.warn('Auto rate lookup error:', err);
     }
+  };
+
+  const handleMonthlyFieldChange = (field, value) => {
+    setMonthlyForm(prev => ({ ...prev, [field]: value }));
+    setTouchedMonthlyFields(prev => ({ ...prev, [field]: true }));
+  };
+
+  const handleAdhocFieldChange = (field, value) => {
+    setAdhocForm(prev => ({ ...prev, [field]: value }));
+    setTouchedAdhocFields(prev => ({ ...prev, [field]: true }));
   };
 
   const handleMonthlySubmit = async (e) => {
@@ -208,6 +222,7 @@ export default function LessonsTab({
       notes: ''
     });
     setAdhocError('');
+    setTouchedAdhocFields({});
     setIsAdhocModalOpen(true);
   };
 
@@ -227,6 +242,7 @@ export default function LessonsTab({
       notes: adhoc.notes || ''
     });
     setAdhocError('');
+    setTouchedAdhocFields({});
     setIsAdhocModalOpen(true);
   };
 
@@ -283,6 +299,56 @@ export default function LessonsTab({
     'Beginner', 'Grade 1', 'Grade 2', 'Grade 3', 'Grade 4', 
     'Grade 5', 'Grade 6', 'Grade 7', 'Grade 8', 'Diploma'
   ];
+
+
+
+  // WebRTC Merge Effect for monthlyForm
+  React.useEffect(() => {
+    if (isMonthlyModalOpen && editingMonthlyLesson) {
+      const updatedItem = lessons.find(item => item.id === editingMonthlyLesson.id);
+      if (updatedItem) {
+        setMonthlyForm(prev => {
+          const newData = { ...prev };
+          let hasChanges = false;
+          const fields = ["student_id","teacher_id","instrument","grade","day_of_week","start_time","duration_minutes","monthly_student_fee","monthly_teacher_rate","is_custom_rate","customized_rate_id","start_date","end_date","status"];
+          for (const field of fields) {
+            if (!touchedMonthlyFields[field] && updatedItem[field] !== undefined && updatedItem[field] !== null) {
+              const remoteValue = updatedItem[field];
+              if (newData[field] !== remoteValue) {
+                newData[field] = remoteValue;
+                hasChanges = true;
+              }
+            }
+          }
+          return hasChanges ? newData : prev;
+        });
+      }
+    }
+  }, [lessons, isMonthlyModalOpen, editingMonthlyLesson, touchedMonthlyFields]);
+
+  // WebRTC Merge Effect for adhocForm
+  React.useEffect(() => {
+    if (isAdhocModalOpen && editingAdhocLesson) {
+      const updatedItem = adhocLessons.find(item => item.id === editingAdhocLesson.id);
+      if (updatedItem) {
+        setAdhocForm(prev => {
+          const newData = { ...prev };
+          let hasChanges = false;
+          const fields = ["student_id","teacher_id","instrument","lesson_date","start_time","duration_minutes","student_fee","teacher_pay","status","notes"];
+          for (const field of fields) {
+            if (!touchedAdhocFields[field] && updatedItem[field] !== undefined && updatedItem[field] !== null) {
+              const remoteValue = updatedItem[field];
+              if (newData[field] !== remoteValue) {
+                newData[field] = remoteValue;
+                hasChanges = true;
+              }
+            }
+          }
+          return hasChanges ? newData : prev;
+        });
+      }
+    }
+  }, [adhocLessons, isAdhocModalOpen, editingAdhocLesson, touchedAdhocFields]);
 
   return (
     <div className="tab-pane-content">
@@ -627,7 +693,7 @@ export default function LessonsTab({
                 className="form-control"
                 required
                 value={monthlyForm.day_of_week}
-                onChange={(e) => setMonthlyForm({ ...monthlyForm, day_of_week: Number(e.target.value) })}
+                onChange={(e) => handleMonthlyFieldChange('day_of_week', Number(e.target.value))}
               >
                 {DAYS_OF_WEEK.map((d) => (
                   <option key={d.value} value={d.value}>{d.label}</option>
@@ -642,7 +708,7 @@ export default function LessonsTab({
                 className="form-control"
                 required
                 value={monthlyForm.start_time}
-                onChange={(e) => setMonthlyForm({ ...monthlyForm, start_time: e.target.value })}
+                onChange={(e) => handleMonthlyFieldChange('start_time', e.target.value)}
               />
             </div>
           </div>
@@ -668,11 +734,10 @@ export default function LessonsTab({
                   className="form-control"
                   required
                   value={monthlyForm.monthly_student_fee}
-                  onChange={(e) => setMonthlyForm({ 
-                    ...monthlyForm, 
-                    monthly_student_fee: e.target.value,
-                    is_custom_rate: 1 
-                  })}
+                  onChange={(e) => {
+                    setMonthlyForm({ ...monthlyForm, monthly_student_fee: e.target.value, is_custom_rate: 1 });
+                    setTouchedMonthlyFields(prev => ({ ...prev, monthly_student_fee: true, is_custom_rate: true }));
+                  }}
                 />
               </div>
 
@@ -685,11 +750,10 @@ export default function LessonsTab({
                   className="form-control"
                   required
                   value={monthlyForm.monthly_teacher_rate}
-                  onChange={(e) => setMonthlyForm({ 
-                    ...monthlyForm, 
-                    monthly_teacher_rate: e.target.value,
-                    is_custom_rate: 1 
-                  })}
+                  onChange={(e) => {
+                    setMonthlyForm({ ...monthlyForm, monthly_teacher_rate: e.target.value, is_custom_rate: 1 });
+                    setTouchedMonthlyFields(prev => ({ ...prev, monthly_teacher_rate: true, is_custom_rate: true }));
+                  }}
                 />
               </div>
             </div>
@@ -726,7 +790,7 @@ export default function LessonsTab({
                 className="form-control"
                 required
                 value={monthlyForm.start_date}
-                onChange={(e) => setMonthlyForm({ ...monthlyForm, start_date: e.target.value })}
+                onChange={(e) => handleMonthlyFieldChange('start_date', e.target.value)}
               />
             </div>
             <div className="form-group">
@@ -734,7 +798,7 @@ export default function LessonsTab({
               <select
                 className="form-control"
                 value={monthlyForm.status}
-                onChange={(e) => setMonthlyForm({ ...monthlyForm, status: e.target.value })}
+                onChange={(e) => handleMonthlyFieldChange('status', e.target.value)}
               >
                 <option value="active">Active</option>
                 <option value="paused">Paused</option>
@@ -775,7 +839,7 @@ export default function LessonsTab({
                 className="form-control"
                 required
                 value={adhocForm.student_id}
-                onChange={(e) => setAdhocForm({ ...adhocForm, student_id: e.target.value })}
+                onChange={(e) => handleAdhocFieldChange('student_id', e.target.value)}
               >
                 <option value="">-- Select Student --</option>
                 {students.map((s) => (
@@ -792,7 +856,7 @@ export default function LessonsTab({
                 className="form-control"
                 required
                 value={adhocForm.teacher_id}
-                onChange={(e) => setAdhocForm({ ...adhocForm, teacher_id: e.target.value })}
+                onChange={(e) => handleAdhocFieldChange('teacher_id', e.target.value)}
               >
                 <option value="">-- Select Teacher --</option>
                 {teachers.map((t) => (
@@ -813,7 +877,7 @@ export default function LessonsTab({
                 placeholder="e.g. Piano, Cello, Vocal"
                 required
                 value={adhocForm.instrument}
-                onChange={(e) => setAdhocForm({ ...adhocForm, instrument: e.target.value })}
+                onChange={(e) => handleAdhocFieldChange('instrument', e.target.value)}
               />
             </div>
 
@@ -826,7 +890,7 @@ export default function LessonsTab({
                 className="form-control"
                 required
                 value={adhocForm.duration_minutes}
-                onChange={(e) => setAdhocForm({ ...adhocForm, duration_minutes: Number(e.target.value) })}
+                onChange={(e) => handleAdhocFieldChange('duration_minutes', Number(e.target.value))}
               />
             </div>
           </div>
@@ -839,7 +903,7 @@ export default function LessonsTab({
                 className="form-control"
                 required
                 value={adhocForm.lesson_date}
-                onChange={(e) => setAdhocForm({ ...adhocForm, lesson_date: e.target.value })}
+                onChange={(e) => handleAdhocFieldChange('lesson_date', e.target.value)}
               />
             </div>
 
@@ -850,7 +914,7 @@ export default function LessonsTab({
                 className="form-control"
                 required
                 value={adhocForm.start_time}
-                onChange={(e) => setAdhocForm({ ...adhocForm, start_time: e.target.value })}
+                onChange={(e) => handleAdhocFieldChange('start_time', e.target.value)}
               />
             </div>
           </div>
@@ -865,7 +929,7 @@ export default function LessonsTab({
                 className="form-control"
                 required
                 value={adhocForm.student_fee}
-                onChange={(e) => setAdhocForm({ ...adhocForm, student_fee: e.target.value })}
+                onChange={(e) => handleAdhocFieldChange('student_fee', e.target.value)}
               />
             </div>
 
@@ -878,7 +942,7 @@ export default function LessonsTab({
                 className="form-control"
                 required
                 value={adhocForm.teacher_pay}
-                onChange={(e) => setAdhocForm({ ...adhocForm, teacher_pay: e.target.value })}
+                onChange={(e) => handleAdhocFieldChange('teacher_pay', e.target.value)}
               />
             </div>
           </div>
@@ -889,7 +953,7 @@ export default function LessonsTab({
               <select
                 className="form-control"
                 value={adhocForm.status}
-                onChange={(e) => setAdhocForm({ ...adhocForm, status: e.target.value })}
+                onChange={(e) => handleAdhocFieldChange('status', e.target.value)}
               >
                 <option value="scheduled">Scheduled</option>
                 <option value="completed">Completed</option>
@@ -903,7 +967,7 @@ export default function LessonsTab({
                 className="form-control"
                 placeholder="e.g. Exam trial session"
                 value={adhocForm.notes}
-                onChange={(e) => setAdhocForm({ ...adhocForm, notes: e.target.value })}
+                onChange={(e) => handleAdhocFieldChange('notes', e.target.value)}
               />
             </div>
           </div>

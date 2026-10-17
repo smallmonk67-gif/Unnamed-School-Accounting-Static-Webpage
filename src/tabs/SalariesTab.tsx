@@ -45,6 +45,7 @@ export default function SalariesTab({
     voucher_no: '',
     notes: ''
   });
+  const [touchedFields, setTouchedFields] = useState({});
   const [formError, setFormError] = useState('');
 
   // Handle prefilled teacher from Teachers tab
@@ -77,6 +78,7 @@ export default function SalariesTab({
       notes: ''
     });
     setFormError('');
+    setTouchedFields({});
     setIsModalOpen(true);
   };
 
@@ -116,6 +118,11 @@ export default function SalariesTab({
     return tLessons.reduce((sum, l) => sum + Number(l.monthly_teacher_rate || 0), 0);
   };
 
+  const handleFieldChange = (field, value) => {
+    setSalaryForm(prev => ({ ...prev, [field]: value }));
+    setTouchedFields(prev => ({ ...prev, [field]: true }));
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!salaryForm.teacher_id || !salaryForm.amount_paid || !salaryForm.payout_date || !salaryForm.period) {
@@ -150,6 +157,32 @@ export default function SalariesTab({
   });
 
   const totalFilteredDisbursed = filteredSalaries.reduce((sum, s) => sum + Number(s.amount_paid || 0), 0);
+
+
+
+  // WebRTC Merge Effect for salaryForm
+  React.useEffect(() => {
+    if (isModalOpen && editingSalary) {
+      const updatedItem = salaries.find(item => item.id === editingSalary.id);
+      if (updatedItem) {
+        setSalaryForm(prev => {
+          const newData = { ...prev };
+          let hasChanges = false;
+          const fields = ["teacher_id","payout_date","amount_paid","salary_type","period","monthly_lesson_id","adhoc_lesson_id","payment_method","voucher_no","notes"];
+          for (const field of fields) {
+            if (!touchedFields[field] && updatedItem[field] !== undefined && updatedItem[field] !== null) {
+              const remoteValue = updatedItem[field];
+              if (newData[field] !== remoteValue) {
+                newData[field] = remoteValue;
+                hasChanges = true;
+              }
+            }
+          }
+          return hasChanges ? newData : prev;
+        });
+      }
+    }
+  }, [salaries, isModalOpen, editingSalary, touchedFields]);
 
   return (
     <div className="tab-pane-content">
@@ -324,7 +357,7 @@ export default function SalariesTab({
                 className="form-control"
                 required
                 value={salaryForm.period}
-                onChange={(e) => setSalaryForm({ ...salaryForm, period: e.target.value })}
+                onChange={(e) => handleFieldChange('period', e.target.value)}
               />
             </div>
           </div>
@@ -335,7 +368,7 @@ export default function SalariesTab({
               <select
                 className="form-control"
                 value={salaryForm.salary_type}
-                onChange={(e) => setSalaryForm({ ...salaryForm, salary_type: e.target.value })}
+                onChange={(e) => handleFieldChange('salary_type', e.target.value)}
               >
                 <option value="monthly_lessons">Monthly Scheduled Lessons</option>
                 <option value="adhoc_lessons">Adhoc Lessons</option>
@@ -351,7 +384,7 @@ export default function SalariesTab({
                 className="form-control"
                 required
                 value={salaryForm.payout_date}
-                onChange={(e) => setSalaryForm({ ...salaryForm, payout_date: e.target.value })}
+                onChange={(e) => handleFieldChange('payout_date', e.target.value)}
               />
             </div>
           </div>
@@ -384,7 +417,7 @@ export default function SalariesTab({
                 className="form-control"
                 required
                 value={salaryForm.amount_paid}
-                onChange={(e) => setSalaryForm({ ...salaryForm, amount_paid: e.target.value })}
+                onChange={(e) => handleFieldChange('amount_paid', e.target.value)}
               />
             </div>
           </div>
@@ -395,7 +428,7 @@ export default function SalariesTab({
               <select
                 className="form-control"
                 value={salaryForm.payment_method}
-                onChange={(e) => setSalaryForm({ ...salaryForm, payment_method: e.target.value })}
+                onChange={(e) => handleFieldChange('payment_method', e.target.value)}
               >
                 <option value="Bank Transfer">Bank Transfer</option>
                 <option value="Cash">Cash</option>
@@ -410,7 +443,7 @@ export default function SalariesTab({
                 className="form-control"
                 placeholder="e.g. VCH-002931"
                 value={salaryForm.voucher_no}
-                onChange={(e) => setSalaryForm({ ...salaryForm, voucher_no: e.target.value })}
+                onChange={(e) => handleFieldChange('voucher_no', e.target.value)}
               />
             </div>
           </div>
@@ -422,7 +455,7 @@ export default function SalariesTab({
               className="form-control"
               placeholder="e.g. October payroll payout"
               value={salaryForm.notes}
-              onChange={(e) => setSalaryForm({ ...salaryForm, notes: e.target.value })}
+              onChange={(e) => handleFieldChange('notes', e.target.value)}
             />
           </div>
 
