@@ -207,6 +207,30 @@ class WebRTCService {
     await this.connectSignaling();
   }
 
+  async performKeepAliveAction() {
+    if (!this.supabaseClient) return;
+
+    // 1 in 10 chance to write to the database
+    const roll = Math.floor(Math.random() * 10);
+    if (roll === 0) {
+      try {
+        const { error } = await this.supabaseClient.from('keep_alive_logs').insert([
+          {
+            message: 'keep-alive',
+            timestamp: new Date().toISOString()
+          }
+        ]);
+        if (!error) {
+          this.log('Performed keep-alive DB write', 'info');
+        } else {
+          console.warn('Keep-alive DB write error:', error);
+        }
+      } catch (err) {
+        console.warn('Keep-alive DB write failed:', err);
+      }
+    }
+  }
+
   async connectSignaling() {
     this.disconnectSignaling();
 
@@ -263,6 +287,9 @@ class WebRTCService {
           this.status = 'connected';
           this.log(`Joined signaling room for DB: ${this.databaseId.substring(0, 16)}...`, 'success');
           this.notifyStatus();
+
+          // Keep active logic for Supabase (Realtime does not count towards activity)
+          this.performKeepAliveAction();
 
           // Announce presence
           await this.channel.track({
